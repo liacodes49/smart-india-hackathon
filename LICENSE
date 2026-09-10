@@ -1,0 +1,14 @@
+# Antarctic Digital Twin (SIH 2025)
+
+## Overview
+A monorepo for the Antarctic Research Station Digital Twin platform.
+
+## Setup
+1. \pnpm install\
+2. Copy \.env.example\ to \.env\
+3. \pnpm dev\
+"@ | Set-Content -Path "c:\Users\zaids\smart-india-hackathon\README.md" -Encoding UTF8 -Force
+
+# LICENSE
+@"
+MIT License

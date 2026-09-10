@@ -1,0 +1,14 @@
+name: Deploy Web
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    # TODO: Add web deployment steps (e.g. Vercel)
