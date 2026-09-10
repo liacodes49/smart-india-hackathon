@@ -1,0 +1,14 @@
+name: Deploy API
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    # TODO: Add api deployment steps
