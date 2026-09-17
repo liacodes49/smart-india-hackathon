@@ -1,12 +1,28 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import {
+    useEffect,
+    useRef,
+} from "react";
+
+import {
+    useFrame,
+    useThree,
+} from "@react-three/fiber";
+
 import * as THREE from "three";
 
 export interface CameraTarget {
-    position: [number, number, number];
-    lookAt: [number, number, number];
+    position: [
+        number,
+        number,
+        number,
+    ];
+    lookAt: [
+        number,
+        number,
+        number,
+    ];
 }
 
 type ControlsLike = {
@@ -24,82 +40,112 @@ export function CameraController({
     target,
     lerpSpeed = 0.08,
 }: CameraControllerProps) {
-    const { camera, controls } = useThree() as unknown as {
-        camera: THREE.Camera;
-        controls: ControlsLike;
-    };
+    const {
+        camera,
+        controls,
+    } =
+        useThree() as unknown as {
+            camera: THREE.Camera;
+            controls: ControlsLike;
+        };
 
-    const desiredPosition = useRef(new THREE.Vector3());
-    const desiredLookAt = useRef(new THREE.Vector3());
+    const desiredPosition =
+        useRef(
+            new THREE.Vector3(),
+        );
 
-    const animating = useRef(false);
+    const desiredLookAt =
+        useRef(
+            new THREE.Vector3(),
+        );
+
+    const animating =
+        useRef(false);
 
     useEffect(() => {
-        desiredPosition.current.set(...target.position);
-        desiredLookAt.current.set(...target.lookAt);
+        desiredPosition.current.set(
+            ...target.position,
+        );
+
+        desiredLookAt.current.set(
+            ...target.lookAt,
+        );
 
         animating.current = true;
 
         if (controls) {
             controls.enabled = false;
 
-            // Immediately establish the correct center point.
-            controls.target.copy(desiredLookAt.current);
+            controls.target.copy(
+                desiredLookAt.current,
+            );
         }
-    }, [target, controls]);
+    }, [
+        target,
+        controls,
+    ]);
 
     useFrame(() => {
-        if (!animating.current) {
+        if (
+            !animating.current
+        ) {
             return;
         }
 
         camera.position.lerp(
             desiredPosition.current,
-            lerpSpeed
+            lerpSpeed,
         );
 
         if (controls) {
             controls.target.lerp(
                 desiredLookAt.current,
-                lerpSpeed
+                lerpSpeed,
             );
         } else {
-            camera.lookAt(desiredLookAt.current);
+            camera.lookAt(
+                desiredLookAt.current,
+            );
         }
 
         const positionDistance =
             camera.position.distanceTo(
-                desiredPosition.current
+                desiredPosition.current,
             );
 
-        const targetDistance = controls
-            ? controls.target.distanceTo(
-                desiredLookAt.current
-            )
-            : 0;
+        const targetDistance =
+            controls
+                ? controls.target.distanceTo(
+                    desiredLookAt.current,
+                )
+                : 0;
 
         if (
-            positionDistance < 0.05 &&
-            targetDistance < 0.05
+            positionDistance <
+            0.05 &&
+            targetDistance <
+            0.05
         ) {
             camera.position.copy(
-                desiredPosition.current
+                desiredPosition.current,
             );
 
             if (controls) {
                 controls.target.copy(
-                    desiredLookAt.current
+                    desiredLookAt.current,
                 );
 
                 controls.enabled = true;
+
                 controls.update();
             } else {
                 camera.lookAt(
-                    desiredLookAt.current
+                    desiredLookAt.current,
                 );
             }
 
-            animating.current = false;
+            animating.current =
+                false;
         }
     });
 
@@ -109,7 +155,9 @@ export function CameraController({
                 controls.enabled = true;
             }
         };
-    }, [controls]);
+    }, [
+        controls,
+    ]);
 
     return null;
 }

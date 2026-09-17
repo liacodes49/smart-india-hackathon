@@ -1,3 +1,1 @@
-export { AntarcticaOverview } from "./AntarcticaOverview";
-export { StationMarker } from "./StationMarker";
-export type { StationStatus } from "./StationMarker"; 
+export { default as AntarcticaOverview } from "./AntarcticaOverview";

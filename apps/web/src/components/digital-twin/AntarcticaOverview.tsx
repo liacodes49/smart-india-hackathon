@@ -33,7 +33,9 @@ import {
     type CameraTarget,
 } from "@/components/digital-twin/CameraController";
 
-import StationEnvironment from "./StationEnvironment";
+import StationEnvironment, {
+    type StationViewMode,
+} from "./StationEnvironment";
 
 import AntarcticaTerrain from "./AntarcticaTerrain";
 import AntarcticaOutline from "./AntarcticaOutline";
@@ -51,6 +53,10 @@ import {
     type AssetHealth,
     type TelemetryAsset,
 } from "@/features/digital-twin/utils/StationTelemetry";
+
+/* -------------------------------------------------------------------------- */
+/* Constants                                                                  */
+/* -------------------------------------------------------------------------- */
 
 const OVERVIEW_TARGET: CameraTarget = {
     position: [
@@ -74,6 +80,44 @@ const HEALTH_COLORS: Record<
     CRITICAL: "#ef4444",
     OFFLINE: "#6b7280",
 };
+
+const VIEW_MODES: {
+    id: StationViewMode;
+    label: string;
+    description: string;
+}[] = [
+        {
+            id: "NORMAL",
+            label: "Normal",
+            description: "Full station view",
+        },
+        {
+            id: "ENERGY",
+            label: "Energy",
+            description: "Power infrastructure",
+        },
+        {
+            id: "RISK",
+            label: "Risk",
+            description: "Health and alerts",
+        },
+        {
+            id: "LOGISTICS",
+            label: "Logistics",
+            description: "Fuel and logistics",
+        },
+    ];
+
+type CameraPreset =
+    | "OVERVIEW"
+    | "POWER_STATION"
+    | "FUEL_FARM"
+    | "HABITAT"
+    | "LOGISTICS";
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
 
 function getStationWorldPosition(
     station: StationCoordinates,
@@ -122,7 +166,6 @@ function getStationCameraTarget(
             y + 6.5,
             z + 10.5,
         ],
-
         lookAt: [
             x,
             y + 1,
@@ -131,11 +174,154 @@ function getStationCameraTarget(
     };
 }
 
+function getCameraPresetTarget(
+    station: StationCoordinates,
+    terrainData: TerrainData | null,
+    preset: CameraPreset,
+): CameraTarget {
+    const {
+        x,
+        y,
+        z,
+    } = getStationWorldPosition(
+        station,
+        terrainData,
+    );
+
+    switch (preset) {
+        case "POWER_STATION":
+            return {
+                position: [
+                    x + 11,
+                    y + 5.8,
+                    z + 2.5,
+                ],
+                lookAt: [
+                    x + 6,
+                    y + 1.5,
+                    z - 3.5,
+                ],
+            };
+
+        case "FUEL_FARM":
+            return {
+                position: [
+                    x - 13,
+                    y + 5.2,
+                    z + 4,
+                ],
+                lookAt: [
+                    x - 7,
+                    y + 0.9,
+                    z - 4.3,
+                ],
+            };
+
+        case "HABITAT":
+            return {
+                position: [
+                    x + 9.5,
+                    y + 4.8,
+                    z + 9.5,
+                ],
+                lookAt: [
+                    x,
+                    y + 1.7,
+                    z,
+                ],
+            };
+
+        case "LOGISTICS":
+            return {
+                position: [
+                    x - 11,
+                    y + 5.5,
+                    z - 1,
+                ],
+                lookAt: [
+                    x - 3,
+                    y + 1,
+                    z + 2,
+                ],
+            };
+
+        case "OVERVIEW":
+        default:
+            return getStationCameraTarget(
+                station,
+                terrainData,
+            );
+    }
+}
+
+function getStationHealth(
+    telemetry: TelemetryAsset[],
+): StationStatus {
+    if (
+        telemetry.some(
+            (asset) =>
+                asset.health ===
+                "CRITICAL",
+        )
+    ) {
+        return "CRITICAL";
+    }
+
+    if (
+        telemetry.some(
+            (asset) =>
+                asset.health ===
+                "WARNING",
+        )
+    ) {
+        return "WARNING";
+    }
+
+    if (
+        telemetry.some(
+            (asset) =>
+                asset.health ===
+                "OFFLINE",
+        )
+    ) {
+        return "OFFLINE";
+    }
+
+    return "NORMAL";
+}
+
+function getCriticalCameraPreset(
+    assetId: string,
+): CameraPreset | null {
+    switch (assetId) {
+        case "generator":
+            return "POWER_STATION";
+
+        case "fuel-farm":
+            return "FUEL_FARM";
+
+        case "main-building":
+            return "HABITAT";
+
+        case "container-01":
+        case "pump-house":
+            return "LOGISTICS";
+
+        default:
+            return null;
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Station markers                                                            */
+/* -------------------------------------------------------------------------- */
+
 interface StationMarkersProps {
     terrainData: TerrainData | null;
     selectedStation:
     | StationCoordinates
     | null;
+    stationStatus: StationStatus;
     onSelect: (
         station: StationCoordinates,
     ) => void;
@@ -144,6 +330,7 @@ interface StationMarkersProps {
 function StationMarkers({
     terrainData,
     selectedStation,
+    stationStatus,
     onSelect,
 }: StationMarkersProps) {
     return (
@@ -182,7 +369,7 @@ function StationMarkers({
                                 z,
                             ]}
                             status={
-                                station.status as StationStatus
+                                stationStatus
                             }
                             onSelect={() =>
                                 onSelect(
@@ -196,6 +383,10 @@ function StationMarkers({
         </>
     );
 }
+
+/* -------------------------------------------------------------------------- */
+/* UI helpers                                                                 */
+/* -------------------------------------------------------------------------- */
 
 function StatusDot({
     health,
@@ -233,6 +424,7 @@ function Metric({
 
             <p className="mt-1 text-lg font-semibold text-white">
                 {value.toFixed(1)}
+
                 <span className="ml-1 text-[10px] font-normal text-slate-500">
                     {unit}
                 </span>
@@ -240,6 +432,10 @@ function Metric({
         </div>
     );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Telemetry panel                                                            */
+/* -------------------------------------------------------------------------- */
 
 function TelemetryPanel({
     asset,
@@ -278,7 +474,6 @@ function TelemetryPanel({
                         health={
                             asset.health
                         }
-
                     />
 
                     <span
@@ -353,6 +548,10 @@ function TelemetryPanel({
         </div>
     );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Command panel                                                              */
+/* -------------------------------------------------------------------------- */
 
 function CommandPanel({
     telemetry,
@@ -489,6 +688,10 @@ function CommandPanel({
     );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Alerts panel                                                               */
+/* -------------------------------------------------------------------------- */
+
 function AlertsPanel({
     telemetry,
 }: {
@@ -531,17 +734,9 @@ function AlertsPanel({
                                     }
                                 />
 
-                                <div className="flex items-center gap-2">
-                                    <StatusDot
-                                        health={
-                                            asset.health
-                                        }
-                                    />
-
-                                    <span className="text-xs font-medium text-white">
-                                        {asset.name}
-                                    </span>
-                                </div>
+                                <span className="text-xs font-medium text-white">
+                                    {asset.name}
+                                </span>
                             </div>
 
                             <p className="mt-1 text-[10px] text-slate-500">
@@ -561,6 +756,129 @@ function AlertsPanel({
     );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Mode selector                                                              */
+/* -------------------------------------------------------------------------- */
+
+function ModeSelector({
+    mode,
+    onChange,
+}: {
+    mode: StationViewMode;
+    onChange: (
+        mode: StationViewMode,
+    ) => void;
+}) {
+    return (
+        <div className="absolute left-1/2 top-5 z-30 -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-950/80 p-1.5 shadow-2xl backdrop-blur-xl">
+            <div className="flex gap-1">
+                {VIEW_MODES.map(
+                    (item) => (
+                        <button
+                            key={
+                                item.id
+                            }
+                            type="button"
+                            title={
+                                item.description
+                            }
+                            onClick={() =>
+                                onChange(
+                                    item.id,
+                                )
+                            }
+                            className={`rounded-xl px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.15em] transition ${mode ===
+                                    item.id
+                                    ? "bg-sky-400/15 text-sky-300"
+                                    : "text-slate-500 hover:bg-white/5 hover:text-slate-200"
+                                }`}
+                        >
+                            {
+                                item.label
+                            }
+                        </button>
+                    ),
+                )}
+            </div>
+        </div>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Camera preset selector                                                     */
+/* -------------------------------------------------------------------------- */
+
+function CameraPresets({
+    preset,
+    onChange,
+}: {
+    preset: CameraPreset;
+    onChange: (
+        preset: CameraPreset,
+    ) => void;
+}) {
+    const presets: {
+        id: CameraPreset;
+        label: string;
+    }[] = [
+            {
+                id: "OVERVIEW",
+                label: "Overview",
+            },
+            {
+                id: "POWER_STATION",
+                label: "Power Station",
+            },
+            {
+                id: "FUEL_FARM",
+                label: "Fuel Farm",
+            },
+            {
+                id: "HABITAT",
+                label: "Habitat",
+            },
+            {
+                id: "LOGISTICS",
+                label: "Logistics",
+            },
+        ];
+
+    return (
+        <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-950/80 p-1.5 shadow-2xl backdrop-blur-xl">
+            <div className="flex gap-1">
+                {presets.map(
+                    (item) => (
+                        <button
+                            key={
+                                item.id
+                            }
+                            type="button"
+                            onClick={() =>
+                                onChange(
+                                    item.id,
+                                )
+                            }
+                            className={`rounded-xl px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.12em] transition ${preset ===
+                                    item.id
+                                    ? "bg-white/10 text-white"
+                                    : "text-slate-500 hover:bg-white/5 hover:text-slate-200"
+                                }`}
+                        >
+                            {
+                                item.label
+                            }
+                        </button>
+                    ),
+                )}
+            </div>
+        </div>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Scene                                                                      */
+/* -------------------------------------------------------------------------- */
+
 interface SceneProps {
     terrainData: TerrainData | null;
     selectedStation:
@@ -568,6 +886,9 @@ interface SceneProps {
     | null;
     cameraTarget: CameraTarget;
     selectedAssetId: string | null;
+    stationStatus: StationStatus;
+    telemetry: TelemetryAsset[];
+    viewMode: StationViewMode;
     onSelectStation: (
         station: StationCoordinates,
     ) => void;
@@ -581,6 +902,9 @@ function Scene({
     selectedStation,
     cameraTarget,
     selectedAssetId,
+    stationStatus,
+    telemetry,
+    viewMode,
     onSelectStation,
     onSelectAsset,
 }: SceneProps) {
@@ -598,6 +922,9 @@ function Scene({
                 }
                 selectedStation={
                     selectedStation
+                }
+                stationStatus={
+                    stationStatus
                 }
                 onSelect={
                     onSelectStation
@@ -631,6 +958,12 @@ function Scene({
                         selectedAssetId={
                             selectedAssetId
                         }
+                        telemetry={
+                            telemetry
+                        }
+                        viewMode={
+                            viewMode
+                        }
                         onSelectAsset={
                             onSelectAsset
                         }
@@ -659,6 +992,10 @@ function Scene({
         </>
     );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Main component                                                             */
+/* -------------------------------------------------------------------------- */
 
 export default function AntarcticaOverview() {
     const [
@@ -692,6 +1029,27 @@ export default function AntarcticaOverview() {
         INITIAL_TELEMETRY,
     );
 
+    const [
+        viewMode,
+        setViewMode,
+    ] =
+        useState<StationViewMode>(
+            "NORMAL",
+        );
+
+    const [
+        cameraPreset,
+        setCameraPreset,
+    ] =
+        useState<CameraPreset>(
+            "OVERVIEW",
+        );
+
+    const [
+        autoFocusEnabled,
+        setAutoFocusEnabled,
+    ] = useState(true);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -715,11 +1073,6 @@ export default function AntarcticaOverview() {
         };
     }, []);
 
-    /*
-     * Live telemetry simulator.
-     *
-     * Updates every 1.5 seconds.
-     */
     useEffect(() => {
         if (!selectedStation) {
             return;
@@ -741,6 +1094,95 @@ export default function AntarcticaOverview() {
             );
     }, [selectedStation]);
 
+    const selectedAsset =
+        telemetry.find(
+            (asset) =>
+                asset.id ===
+                selectedAssetId,
+        ) ?? null;
+
+    const stationStatus =
+        useMemo(
+            () =>
+                getStationHealth(
+                    telemetry,
+                ),
+            [telemetry],
+        );
+
+    const criticalAsset =
+        useMemo(
+            () =>
+                telemetry.find(
+                    (asset) =>
+                        asset.health ===
+                        "CRITICAL",
+                ) ?? null,
+            [telemetry],
+        );
+
+    /*
+     * Automatically focus the camera when a NEW critical asset appears.
+     *
+     * The ref-like state is represented by the previous critical ID so
+     * telemetry updates every 1.5 seconds do not constantly interrupt the
+     * operator's camera movement.
+     */
+    const [
+        lastAutoFocusedCriticalId,
+        setLastAutoFocusedCriticalId,
+    ] = useState<
+        string | null
+    >(null);
+
+    useEffect(() => {
+        if (
+            !selectedStation ||
+            !autoFocusEnabled ||
+            !criticalAsset
+        ) {
+            if (
+                !criticalAsset
+            ) {
+                setLastAutoFocusedCriticalId(
+                    null,
+                );
+            }
+
+            return;
+        }
+
+        if (
+            criticalAsset.id ===
+            lastAutoFocusedCriticalId
+        ) {
+            return;
+        }
+
+        const preset =
+            getCriticalCameraPreset(
+                criticalAsset.id,
+            );
+
+        if (preset) {
+            setCameraPreset(
+                preset,
+            );
+            setViewMode(
+                "RISK",
+            );
+        }
+
+        setLastAutoFocusedCriticalId(
+            criticalAsset.id,
+        );
+    }, [
+        selectedStation,
+        autoFocusEnabled,
+        criticalAsset,
+        lastAutoFocusedCriticalId,
+    ]);
+
     const cameraTarget =
         useMemo(() => {
             if (
@@ -750,34 +1192,87 @@ export default function AntarcticaOverview() {
                 return OVERVIEW_TARGET;
             }
 
-            return getStationCameraTarget(
+            return getCameraPresetTarget(
                 selectedStation,
                 terrainData,
+                cameraPreset,
             );
         }, [
             selectedStation,
             terrainData,
+            cameraPreset,
         ]);
-
-    const selectedAsset =
-        telemetry.find(
-            (asset) =>
-                asset.id ===
-                selectedAssetId,
-        ) ?? null;
 
     function handleSelectStation(
         station: StationCoordinates,
     ) {
-        setSelectedAssetId(null);
+        setSelectedAssetId(
+            null,
+        );
+
         setSelectedStation(
             station,
+        );
+
+        setCameraPreset(
+            "OVERVIEW",
+        );
+
+        setViewMode(
+            "NORMAL",
+        );
+
+        setLastAutoFocusedCriticalId(
+            null,
         );
     }
 
     function handleReturn() {
-        setSelectedAssetId(null);
-        setSelectedStation(null);
+        setSelectedAssetId(
+            null,
+        );
+
+        setSelectedStation(
+            null,
+        );
+
+        setCameraPreset(
+            "OVERVIEW",
+        );
+
+        setViewMode(
+            "NORMAL",
+        );
+
+        setLastAutoFocusedCriticalId(
+            null,
+        );
+    }
+
+    function handleModeChange(
+        mode: StationViewMode,
+    ) {
+        setViewMode(
+            mode,
+        );
+    }
+
+    function handlePresetChange(
+        preset: CameraPreset,
+    ) {
+        if (
+            !selectedStation
+        ) {
+            return;
+        }
+
+        setAutoFocusEnabled(
+            true,
+        );
+
+        setCameraPreset(
+            preset,
+        );
     }
 
     return (
@@ -810,6 +1305,15 @@ export default function AntarcticaOverview() {
                     selectedAssetId={
                         selectedAssetId
                     }
+                    stationStatus={
+                        stationStatus
+                    }
+                    telemetry={
+                        telemetry
+                    }
+                    viewMode={
+                        viewMode
+                    }
                     onSelectStation={
                         handleSelectStation
                     }
@@ -821,6 +1325,15 @@ export default function AntarcticaOverview() {
 
             {selectedStation && (
                 <>
+                    <ModeSelector
+                        mode={
+                            viewMode
+                        }
+                        onChange={
+                            handleModeChange
+                        }
+                    />
+
                     <div className="absolute left-5 top-5 z-20">
                         <button
                             type="button"
@@ -849,23 +1362,94 @@ export default function AntarcticaOverview() {
                                     style={{
                                         backgroundColor:
                                             HEALTH_COLORS[
-                                            selectedStation.status as AssetHealth
-                                            ] ??
-                                            "#22c55e",
+                                            stationStatus
+                                            ],
+                                        boxShadow: `0 0 10px ${HEALTH_COLORS[stationStatus]}`,
                                     }}
                                 />
 
-                                <span className="text-[10px] text-slate-400">
-                                    Systems
-                                    online
+                                <span
+                                    className="text-[10px]"
+                                    style={{
+                                        color:
+                                            HEALTH_COLORS[
+                                            stationStatus
+                                            ],
+                                    }}
+                                >
+                                    {stationStatus}
                                 </span>
 
                                 <span className="ml-auto font-mono text-[9px] text-slate-600">
                                     LIVE
                                 </span>
                             </div>
+
+                            <div className="mt-3 border-t border-white/8 pt-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] uppercase tracking-[0.15em] text-slate-600">
+                                        Mode
+                                    </span>
+
+                                    <span className="text-[10px] font-medium text-slate-300">
+                                        {
+                                            viewMode
+                                        }
+                                    </span>
+                                </div>
+
+                                <div className="mt-2 flex items-center justify-between">
+                                    <span className="text-[9px] uppercase tracking-[0.15em] text-slate-600">
+                                        Camera
+                                    </span>
+
+                                    <span className="text-[10px] font-medium text-slate-300">
+                                        {cameraPreset ===
+                                            "POWER_STATION"
+                                            ? "Power Station"
+                                            : cameraPreset ===
+                                                "FUEL_FARM"
+                                                ? "Fuel Farm"
+                                                : cameraPreset ===
+                                                    "HABITAT"
+                                                    ? "Habitat"
+                                                    : cameraPreset ===
+                                                        "LOGISTICS"
+                                                        ? "Logistics"
+                                                        : "Overview"}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setAutoFocusEnabled(
+                                (value) =>
+                                    !value,
+                            )
+                        }
+                        className={`absolute right-5 top-5 z-30 rounded-xl border px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.15em] shadow-xl backdrop-blur-xl transition ${autoFocusEnabled
+                                ? "border-red-400/30 bg-red-500/10 text-red-300"
+                                : "border-white/10 bg-slate-950/80 text-slate-500"
+                            }`}
+                    >
+                        Auto Focus{" "}
+                        {autoFocusEnabled
+                            ? "ON"
+                            : "OFF"}
+                    </button>
+
+                    <CameraPresets
+                        preset={
+                            cameraPreset
+                        }
+                        onChange={
+                            handlePresetChange
+                        }
+                    />
 
                     <CommandPanel
                         telemetry={
