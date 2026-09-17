@@ -5,6 +5,7 @@ import { Grid } from "@react-three/drei";
 export default function OverviewEnvironment() {
     return (
         <>
+            {/* Deep polar-night style background */}
             <color
                 attach="background"
                 args={["#020617"]}
@@ -15,20 +16,30 @@ export default function OverviewEnvironment() {
                 args={[
                     "#020617",
                     42,
-                    82,
+                    90,
                 ]}
             />
 
+            {/* Base ambient illumination */}
             <ambientLight
-                intensity={1.25}
+                intensity={0.65}
             />
 
+            {/* Main directional light */}
             <directionalLight
-                position={[12, 24, 10]}
-                intensity={3.2}
+                position={[
+                    12,
+                    24,
+                    10,
+                ]}
+                intensity={2.15}
                 castShadow
-                shadow-mapSize-width={2048}
-                shadow-mapSize-height={2048}
+                shadow-mapSize-width={
+                    2048
+                }
+                shadow-mapSize-height={
+                    2048
+                }
                 shadow-camera-near={1}
                 shadow-camera-far={90}
                 shadow-camera-left={-40}
@@ -37,34 +48,48 @@ export default function OverviewEnvironment() {
                 shadow-camera-bottom={-40}
             />
 
+            {/* Cool fill light */}
             <directionalLight
-                position={[-20, 15, -18]}
-                intensity={1.2}
+                position={[
+                    -20,
+                    14,
+                    -16,
+                ]}
+                intensity={0.65}
+                color="#8fb7ca"
             />
 
-            <hemisphereLight
-                skyColor="#dbeafe"
-                groundColor="#0f172a"
-                intensity={0.7}
-            />
-
+            {/* Subtle horizon illumination */}
             <pointLight
-                position={[0, 10, -18]}
-                intensity={1.4}
+                position={[
+                    0,
+                    10,
+                    -22,
+                ]}
+                intensity={0.7}
                 distance={60}
+                color="#6ba5c0"
             />
 
+            {/* Technical grid */}
             <Grid
-                position={[0, -0.72, 0]}
-                args={[70, 70]}
+                position={[
+                    0,
+                    -0.72,
+                    0,
+                ]}
+                args={[
+                    70,
+                    70,
+                ]}
                 cellSize={1}
-                cellThickness={0.3}
-                cellColor="#334155"
+                cellThickness={0.25}
+                cellColor="#26384a"
                 sectionSize={5}
-                sectionThickness={0.65}
-                sectionColor="#475569"
-                fadeDistance={45}
-                fadeStrength={1.4}
+                sectionThickness={0.55}
+                sectionColor="#3b5064"
+                fadeDistance={42}
+                fadeStrength={1.2}
                 infiniteGrid
             />
         </>

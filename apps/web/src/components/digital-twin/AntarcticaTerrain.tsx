@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
+
 import * as THREE from "three";
 
 import {
@@ -16,263 +21,211 @@ const MESH_SEGMENTS = 512;
 function createTerrainGeometry(
     terrainData: TerrainData,
 ): THREE.BufferGeometry {
-    const { metadata, heights } = terrainData;
-
-    const segments = MESH_SEGMENTS;
-
-    const vertexCount =
-        (segments + 1) * (segments + 1);
-
-    const positions =
-        new Float32Array(vertexCount * 3);
-
-    const uvs =
-        new Float32Array(vertexCount * 2);
-
-    const indices =
-        new Uint32Array(
-            segments * segments * 6,
+    const geometry =
+        new THREE.PlaneGeometry(
+            1,
+            1,
+            MESH_SEGMENTS,
+            MESH_SEGMENTS,
         );
 
-    const terrainWidth =
+    geometry.rotateX(-Math.PI / 2);
+
+    const position =
+        geometry.attributes.position;
+
+    const {
+        metadata,
+        heights,
+    } = terrainData;
+
+    const width =
         (metadata.bounds.maxX -
             metadata.bounds.minX) *
         SCENE_SCALE;
 
-    const terrainDepth =
+    const depth =
         (metadata.bounds.maxY -
             metadata.bounds.minY) *
         SCENE_SCALE;
 
-    let vertexIndex = 0;
+    const elevationRange =
+        metadata.maxElevation -
+        metadata.minElevation;
 
     for (
-        let z = 0;
-        z <= segments;
-        z++
+        let i = 0;
+        i < position.count;
+        i++
     ) {
-        const v = z / segments;
+        const localX =
+            position.getX(i);
 
-        for (
-            let x = 0;
-            x <= segments;
-            x++
-        ) {
-            const u = x / segments;
+        const localZ =
+            position.getZ(i);
 
-            const sampleX = Math.min(
+        const u =
+            localX + 0.5;
+
+        const v =
+            localZ + 0.5;
+
+        const pixelX =
+            THREE.MathUtils.clamp(
+                u,
+                0,
+                1,
+            ) *
+            (TERRAIN_RESOLUTION - 1);
+
+        const pixelY =
+            THREE.MathUtils.clamp(
+                v,
+                0,
+                1,
+            ) *
+            (TERRAIN_RESOLUTION - 1);
+
+        const x0 =
+            Math.floor(pixelX);
+
+        const y0 =
+            Math.floor(pixelY);
+
+        const x1 =
+            Math.min(
+                x0 + 1,
                 TERRAIN_RESOLUTION - 1,
-                Math.round(
-                    u *
-                    (TERRAIN_RESOLUTION - 1),
-                ),
             );
 
-            const sampleY = Math.min(
+        const y1 =
+            Math.min(
+                y0 + 1,
                 TERRAIN_RESOLUTION - 1,
-                Math.round(
-                    v *
-                    (TERRAIN_RESOLUTION - 1),
-                ),
             );
 
-            const heightIndex =
-                sampleY *
-                TERRAIN_RESOLUTION +
-                sampleX;
+        const tx =
+            pixelX - x0;
 
-            const normalizedHeight =
-                heights[heightIndex] / 65535;
+        const ty =
+            pixelY - y0;
 
-            const elevation =
-                metadata.minElevation +
-                normalizedHeight *
-                (metadata.maxElevation -
-                    metadata.minElevation);
+        const i00 =
+            y0 *
+            TERRAIN_RESOLUTION +
+            x0;
 
-            /*
-             * Terrain is centered around its own
-             * local origin.
-             *
-             * The actual mesh position is then moved
-             * to the exact projected center below.
-             */
-            const worldX =
-                (u - 0.5) * terrainWidth;
+        const i10 =
+            y0 *
+            TERRAIN_RESOLUTION +
+            x1;
 
-            const worldZ =
-                (v - 0.5) * terrainDepth;
+        const i01 =
+            y1 *
+            TERRAIN_RESOLUTION +
+            x0;
 
-            positions[
-                vertexIndex * 3
-            ] = worldX;
+        const i11 =
+            y1 *
+            TERRAIN_RESOLUTION +
+            x1;
 
-            positions[
-                vertexIndex * 3 + 1
-            ] =
-                elevation *
-                ELEVATION_SCALE;
+        const h00 =
+            heights[i00] / 65535;
 
-            positions[
-                vertexIndex * 3 + 2
-            ] = worldZ;
+        const h10 =
+            heights[i10] / 65535;
 
-            uvs[
-                vertexIndex * 2
-            ] = u;
+        const h01 =
+            heights[i01] / 65535;
 
-            uvs[
-                vertexIndex * 2 + 1
-            ] = 1 - v;
+        const h11 =
+            heights[i11] / 65535;
 
-            vertexIndex++;
-        }
+        const top =
+            THREE.MathUtils.lerp(
+                h00,
+                h10,
+                tx,
+            );
+
+        const bottom =
+            THREE.MathUtils.lerp(
+                h01,
+                h11,
+                tx,
+            );
+
+        const normalizedHeight =
+            THREE.MathUtils.lerp(
+                top,
+                bottom,
+                ty,
+            );
+
+        const elevation =
+            metadata.minElevation +
+            normalizedHeight *
+            elevationRange;
+
+        position.setX(
+            i,
+            localX * width,
+        );
+
+        position.setY(
+            i,
+            elevation *
+            ELEVATION_SCALE,
+        );
+
+        position.setZ(
+            i,
+            localZ * depth,
+        );
     }
 
-    let indexOffset = 0;
-
-    for (
-        let z = 0;
-        z < segments;
-        z++
-    ) {
-        for (
-            let x = 0;
-            x < segments;
-            x++
-        ) {
-            const a =
-                z * (segments + 1) + x;
-
-            const b = a + 1;
-
-            const c =
-                (z + 1) *
-                (segments + 1) +
-                x;
-
-            const d = c + 1;
-
-            indices[indexOffset++] = a;
-            indices[indexOffset++] = c;
-            indices[indexOffset++] = b;
-
-            indices[indexOffset++] = b;
-            indices[indexOffset++] = c;
-            indices[indexOffset++] = d;
-        }
-    }
-
-    const geometry =
-        new THREE.BufferGeometry();
-
-    geometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(
-            positions,
-            3,
-        ),
-    );
-
-    geometry.setAttribute(
-        "uv",
-        new THREE.BufferAttribute(
-            uvs,
-            2,
-        ),
-    );
-
-    geometry.setIndex(
-        new THREE.BufferAttribute(
-            indices,
-            1,
-        ),
-    );
+    position.needsUpdate = true;
 
     geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
 
     return geometry;
 }
 
 export default function AntarcticaTerrain() {
-    const [terrainData, setTerrainData] =
-        useState<TerrainData | null>(null);
-
-    const [geometry, setGeometry] =
-        useState<THREE.BufferGeometry | null>(
+    const [
+        terrainData,
+        setTerrainData,
+    ] =
+        useState<TerrainData | null>(
             null,
         );
 
-    const [maskTexture, setMaskTexture] =
-        useState<THREE.Texture | null>(null);
+    const [
+        maskTexture,
+        setMaskTexture,
+    ] =
+        useState<THREE.Texture | null>(
+            null,
+        );
 
     useEffect(() => {
         let cancelled = false;
 
-        async function loadTerrain() {
-            try {
-                const data =
-                    await loadTerrainData();
-
-                if (cancelled) {
-                    return;
+        loadTerrainData()
+            .then((data) => {
+                if (!cancelled) {
+                    setTerrainData(data);
                 }
-
-                const terrainGeometry =
-                    createTerrainGeometry(data);
-
-                const textureLoader =
-                    new THREE.TextureLoader();
-
-                textureLoader.load(
-                    "/data/terrain/antarctica-mask.png",
-                    (texture) => {
-                        texture.colorSpace =
-                            THREE.NoColorSpace;
-
-                        texture.wrapS =
-                            THREE.ClampToEdgeWrapping;
-
-                        texture.wrapT =
-                            THREE.ClampToEdgeWrapping;
-
-                        texture.minFilter =
-                            THREE.LinearFilter;
-
-                        texture.magFilter =
-                            THREE.LinearFilter;
-
-                        if (cancelled) {
-                            texture.dispose();
-                            terrainGeometry.dispose();
-                            return;
-                        }
-
-                        setTerrainData(data);
-                        setGeometry(
-                            terrainGeometry,
-                        );
-                        setMaskTexture(texture);
-                    },
-                    undefined,
-                    (error) => {
-                        console.error(
-                            "Failed to load Antarctica terrain mask:",
-                            error,
-                        );
-
-                        terrainGeometry.dispose();
-                    },
-                );
-            } catch (error) {
+            })
+            .catch((error) => {
                 console.error(
                     "Failed to load Antarctica terrain:",
                     error,
                 );
-            }
-        }
-
-        loadTerrain();
+            });
 
         return () => {
             cancelled = true;
@@ -280,11 +233,63 @@ export default function AntarcticaTerrain() {
     }, []);
 
     useEffect(() => {
+        const loader =
+            new THREE.TextureLoader();
+
+        loader.load(
+            "/data/terrain/antarctica-mask.png",
+            (texture) => {
+                texture.colorSpace =
+                    THREE.NoColorSpace;
+
+                texture.wrapS =
+                    THREE.ClampToEdgeWrapping;
+
+                texture.wrapT =
+                    THREE.ClampToEdgeWrapping;
+
+                texture.minFilter =
+                    THREE.LinearFilter;
+
+                texture.magFilter =
+                    THREE.LinearFilter;
+
+                texture.flipY = false;
+
+                setMaskTexture(texture);
+            },
+            undefined,
+            (error) => {
+                console.error(
+                    "Failed to load Antarctica terrain mask:",
+                    error,
+                );
+            },
+        );
+    }, []);
+
+    const geometry =
+        useMemo(() => {
+            if (!terrainData) {
+                return null;
+            }
+
+            return createTerrainGeometry(
+                terrainData,
+            );
+        }, [terrainData]);
+
+    useEffect(() => {
         return () => {
             geometry?.dispose();
+        };
+    }, [geometry]);
+
+    useEffect(() => {
+        return () => {
             maskTexture?.dispose();
         };
-    }, [geometry, maskTexture]);
+    }, [maskTexture]);
 
     if (
         !terrainData ||
@@ -294,26 +299,27 @@ export default function AntarcticaTerrain() {
         return null;
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * The terrain geometry is centered around
-     * its bounding box, so we now move that
-     * geometry to the EXACT EPSG:3031 center
-     * represented by the generated terrain data.
-     */
     const centerX =
-        ((terrainData.metadata.bounds.minX +
-            terrainData.metadata.bounds.maxX) /
-            2) *
+        (
+            terrainData.metadata.bounds
+                .minX +
+            terrainData.metadata.bounds
+                .maxX
+        ) /
+        2 *
         SCENE_SCALE;
 
     const centerZ =
         -(
-            (terrainData.metadata.bounds.minY +
-                terrainData.metadata.bounds.maxY) /
+            (
+                terrainData.metadata.bounds
+                    .minY +
+                terrainData.metadata.bounds
+                    .maxY
+            ) /
             2
-        ) * SCENE_SCALE;
+        ) *
+        SCENE_SCALE;
 
     return (
         <mesh
@@ -326,13 +332,13 @@ export default function AntarcticaTerrain() {
             receiveShadow
         >
             <meshStandardMaterial
-                color="#dcebf2"
+                color="#e8f3f8"
                 roughness={0.92}
                 metalness={0}
-                transparent
                 alphaMap={maskTexture}
+                transparent
                 alphaTest={0.05}
-                side={THREE.DoubleSide}
+                depthWrite
             />
         </mesh>
     );
