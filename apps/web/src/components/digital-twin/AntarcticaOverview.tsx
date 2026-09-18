@@ -71,6 +71,8 @@ const OVERVIEW_TARGET: CameraTarget = {
     ],
 };
 
+const DEFAULT_TIME_OF_DAY = 14.5;
+
 const HEALTH_COLORS: Record<
     AssetHealth,
     string
@@ -114,6 +116,61 @@ type CameraPreset =
     | "FUEL_FARM"
     | "HABITAT"
     | "LOGISTICS";
+
+/* -------------------------------------------------------------------------- */
+/* Time of day helpers                                                        */
+/* -------------------------------------------------------------------------- */
+
+function formatSimulationTime(
+    time: number,
+) {
+    const hours =
+        Math.floor(time);
+
+    const minutes =
+        Math.floor(
+            (time - hours) * 60,
+        );
+
+    return `${String(
+        hours,
+    ).padStart(
+        2,
+        "0",
+    )}:${String(
+        minutes,
+    ).padStart(
+        2,
+        "0",
+    )}`;
+}
+
+function getTimeOfDayLabel(
+    time: number,
+) {
+    if (
+        time >= 6 &&
+        time < 8
+    ) {
+        return "DAWN";
+    }
+
+    if (
+        time >= 8 &&
+        time < 18
+    ) {
+        return "DAY";
+    }
+
+    if (
+        time >= 18 &&
+        time < 20
+    ) {
+        return "DUSK";
+    }
+
+    return "NIGHT";
+}
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -423,7 +480,9 @@ function Metric({
             </p>
 
             <p className="mt-1 text-lg font-semibold text-white">
-                {value.toFixed(1)}
+                {value.toFixed(
+                    1,
+                )}
 
                 <span className="ml-1 text-[10px] font-normal text-slate-500">
                     {unit}
@@ -454,7 +513,9 @@ function TelemetryPanel({
                         </p>
 
                         <h2 className="mt-1 text-lg font-semibold text-white">
-                            {asset.name}
+                            {
+                                asset.name
+                            }
                         </h2>
                     </div>
 
@@ -485,7 +546,9 @@ function TelemetryPanel({
                         }}
                         className="font-medium"
                     >
-                        {asset.health}
+                        {
+                            asset.health
+                        }
                     </span>
 
                     <span className="ml-auto text-[10px] text-slate-500">
@@ -511,25 +574,27 @@ function TelemetryPanel({
                     unit="kW"
                 />
 
-                {asset.fuel > 0 && (
-                    <Metric
-                        label="Fuel"
-                        value={
-                            asset.fuel
-                        }
-                        unit="%"
-                    />
-                )}
+                {asset.fuel >
+                    0 && (
+                        <Metric
+                            label="Fuel"
+                            value={
+                                asset.fuel
+                            }
+                            unit="%"
+                        />
+                    )}
 
-                {asset.water > 0 && (
-                    <Metric
-                        label="Water"
-                        value={
-                            asset.water
-                        }
-                        unit="%"
-                    />
-                )}
+                {asset.water >
+                    0 && (
+                        <Metric
+                            label="Water"
+                            value={
+                                asset.water
+                            }
+                            unit="%"
+                        />
+                    )}
             </div>
 
             <div className="border-t border-white/8 px-4 py-3">
@@ -599,7 +664,9 @@ function CommandPanel({
                         </p>
 
                         <p className="text-sm font-semibold text-green-400">
-                            {normal}
+                            {
+                                normal
+                            }
                         </p>
                     </div>
 
@@ -609,7 +676,9 @@ function CommandPanel({
                         </p>
 
                         <p className="text-sm font-semibold text-yellow-400">
-                            {warnings}
+                            {
+                                warnings
+                            }
                         </p>
                     </div>
 
@@ -619,7 +688,9 @@ function CommandPanel({
                         </p>
 
                         <p className="text-sm font-semibold text-red-400">
-                            {critical}
+                            {
+                                critical
+                            }
                         </p>
                     </div>
                 </div>
@@ -639,9 +710,9 @@ function CommandPanel({
                                 )
                             }
                             className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${selectedAsset ===
-                                asset.id
-                                ? "bg-sky-400/10"
-                                : "hover:bg-white/5"
+                                    asset.id
+                                    ? "bg-sky-400/10"
+                                    : "hover:bg-white/5"
                                 }`}
                         >
                             <StatusDot
@@ -735,7 +806,9 @@ function AlertsPanel({
                                 />
 
                                 <span className="text-xs font-medium text-white">
-                                    {asset.name}
+                                    {
+                                        asset.name
+                                    }
                                 </span>
                             </div>
 
@@ -799,6 +872,107 @@ function ModeSelector({
                         </button>
                     ),
                 )}
+            </div>
+        </div>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Time simulation panel                                                      */
+/* -------------------------------------------------------------------------- */
+
+function TimeSimulationPanel({
+    timeOfDay,
+    onChange,
+}: {
+    timeOfDay: number;
+    onChange: (
+        time: number,
+    ) => void;
+}) {
+    const label =
+        getTimeOfDayLabel(
+            timeOfDay,
+        );
+
+    const labelClass =
+        label === "DAY"
+            ? "text-amber-300"
+            : label ===
+                "NIGHT"
+                ? "text-sky-300"
+                : "text-indigo-300";
+
+    return (
+        <div className="absolute left-1/2 top-[78px] z-30 w-[360px] -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 shadow-2xl backdrop-blur-xl">
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-sky-300">
+                        Time Simulation
+                    </p>
+
+                    <p className="mt-1 text-lg font-semibold text-white">
+                        {formatSimulationTime(
+                            timeOfDay,
+                        )}
+                    </p>
+                </div>
+
+                <div className="text-right">
+                    <p className="text-[9px] uppercase tracking-[0.15em] text-slate-600">
+                        Environment
+                    </p>
+
+                    <p
+                        className={`mt-1 text-[10px] font-semibold ${labelClass}`}
+                    >
+                        {label}
+                    </p>
+                </div>
+            </div>
+
+            <input
+                type="range"
+                min="0"
+                max="23.983"
+                step="0.017"
+                value={
+                    timeOfDay
+                }
+                onChange={(
+                    event,
+                ) =>
+                    onChange(
+                        Number(
+                            event
+                                .target
+                                .value,
+                        ),
+                    )
+                }
+                className="mt-3 w-full accent-sky-400"
+            />
+
+            <div className="mt-1 flex justify-between text-[8px] font-mono text-slate-600">
+                <span>
+                    00:00
+                </span>
+
+                <span>
+                    06:00
+                </span>
+
+                <span>
+                    12:00
+                </span>
+
+                <span>
+                    18:00
+                </span>
+
+                <span>
+                    24:00
+                </span>
             </div>
         </div>
     );
@@ -889,6 +1063,7 @@ interface SceneProps {
     stationStatus: StationStatus;
     telemetry: TelemetryAsset[];
     viewMode: StationViewMode;
+    timeOfDay: number;
     onSelectStation: (
         station: StationCoordinates,
     ) => void;
@@ -905,12 +1080,17 @@ function Scene({
     stationStatus,
     telemetry,
     viewMode,
+    timeOfDay,
     onSelectStation,
     onSelectAsset,
 }: SceneProps) {
     return (
         <>
-            <OverviewEnvironment />
+            <OverviewEnvironment
+                timeOfDay={
+                    timeOfDay
+                }
+            />
 
             <AntarcticaTerrain />
 
@@ -1050,6 +1230,13 @@ export default function AntarcticaOverview() {
         setAutoFocusEnabled,
     ] = useState(true);
 
+    const [
+        timeOfDay,
+        setTimeOfDay,
+    ] = useState(
+        DEFAULT_TIME_OF_DAY,
+    );
+
     useEffect(() => {
         let cancelled = false;
 
@@ -1121,13 +1308,6 @@ export default function AntarcticaOverview() {
             [telemetry],
         );
 
-    /*
-     * Automatically focus the camera when a NEW critical asset appears.
-     *
-     * The ref-like state is represented by the previous critical ID so
-     * telemetry updates every 1.5 seconds do not constantly interrupt the
-     * operator's camera movement.
-     */
     const [
         lastAutoFocusedCriticalId,
         setLastAutoFocusedCriticalId,
@@ -1168,6 +1348,7 @@ export default function AntarcticaOverview() {
             setCameraPreset(
                 preset,
             );
+
             setViewMode(
                 "RISK",
             );
@@ -1222,6 +1403,10 @@ export default function AntarcticaOverview() {
             "NORMAL",
         );
 
+        setTimeOfDay(
+            DEFAULT_TIME_OF_DAY,
+        );
+
         setLastAutoFocusedCriticalId(
             null,
         );
@@ -1242,6 +1427,10 @@ export default function AntarcticaOverview() {
 
         setViewMode(
             "NORMAL",
+        );
+
+        setTimeOfDay(
+            DEFAULT_TIME_OF_DAY,
         );
 
         setLastAutoFocusedCriticalId(
@@ -1314,6 +1503,9 @@ export default function AntarcticaOverview() {
                     viewMode={
                         viewMode
                     }
+                    timeOfDay={
+                        timeOfDay
+                    }
                     onSelectStation={
                         handleSelectStation
                     }
@@ -1331,6 +1523,15 @@ export default function AntarcticaOverview() {
                         }
                         onChange={
                             handleModeChange
+                        }
+                    />
+
+                    <TimeSimulationPanel
+                        timeOfDay={
+                            timeOfDay
+                        }
+                        onChange={
+                            setTimeOfDay
                         }
                     />
 
@@ -1377,7 +1578,9 @@ export default function AntarcticaOverview() {
                                             ],
                                     }}
                                 >
-                                    {stationStatus}
+                                    {
+                                        stationStatus
+                                    }
                                 </span>
 
                                 <span className="ml-auto font-mono text-[9px] text-slate-600">
@@ -1419,6 +1622,43 @@ export default function AntarcticaOverview() {
                                                         : "Overview"}
                                     </span>
                                 </div>
+
+                                <div className="mt-2 flex items-center justify-between">
+                                    <span className="text-[9px] uppercase tracking-[0.15em] text-slate-600">
+                                        Time
+                                    </span>
+
+                                    <span className="text-[10px] font-medium text-slate-300">
+                                        {formatSimulationTime(
+                                            timeOfDay,
+                                        )}
+                                    </span>
+                                </div>
+
+                                <div className="mt-2 flex items-center justify-between">
+                                    <span className="text-[9px] uppercase tracking-[0.15em] text-slate-600">
+                                        Light
+                                    </span>
+
+                                    <span
+                                        className={`text-[10px] font-medium ${getTimeOfDayLabel(
+                                            timeOfDay,
+                                        ) ===
+                                                "DAY"
+                                                ? "text-amber-300"
+                                                : getTimeOfDayLabel(
+                                                    timeOfDay,
+                                                ) ===
+                                                    "NIGHT"
+                                                    ? "text-sky-300"
+                                                    : "text-indigo-300"
+                                            }`}
+                                    >
+                                        {getTimeOfDayLabel(
+                                            timeOfDay,
+                                        )}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1427,11 +1667,13 @@ export default function AntarcticaOverview() {
                         type="button"
                         onClick={() =>
                             setAutoFocusEnabled(
-                                (value) =>
+                                (
+                                    value,
+                                ) =>
                                     !value,
                             )
                         }
-                        className={`absolute right-5 top-5 z-30 rounded-xl border px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.15em] shadow-xl backdrop-blur-xl transition ${autoFocusEnabled
+                        className={`absolute right-5 top-5 z-30 rounded-xl border px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.15em] shadow-xl backdrop-blur-xl ${autoFocusEnabled
                                 ? "border-red-400/30 bg-red-500/10 text-red-300"
                                 : "border-white/10 bg-slate-950/80 text-slate-500"
                             }`}
