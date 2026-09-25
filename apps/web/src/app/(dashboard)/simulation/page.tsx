@@ -1,8 +1,13 @@
+import React from "react";
+import type { Metadata } from "next";
+import { SimulationDashboard } from "@/components/simulation";
+
+export const metadata: Metadata = {
+  title: "What-If Simulation — NCPOR Antarctic Digital Twin",
+  description:
+    "Scenario builder and contingency physical stress simulator for Maitri & Bharati research stations",
+};
+
 export default function SimulationPage() {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Simulation</h1>
-      {/* TODO: Scenario builder, what-if analysis, impact visualization */}
-    </div>
-  );
+  return <SimulationDashboard />;
 }
