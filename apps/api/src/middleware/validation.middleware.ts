@@ -26,7 +26,20 @@ export function validate(schema: ZodSchema, source: 'body' | 'query' | 'params' 
     }
 
     // Replace with parsed (coerced/defaulted) data
-    req[source] = result.data;
+    if (source === 'query') {
+      try {
+        Object.assign(req.query, result.data);
+      } catch {
+        Object.defineProperty(req, 'query', {
+          value: result.data,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
+      }
+    } else {
+      req[source] = result.data;
+    }
     next();
   };
 }

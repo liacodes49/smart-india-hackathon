@@ -1,2 +1,1 @@
-// Telemetry processing pipeline service
-export {};
+export * from './simulator.js';

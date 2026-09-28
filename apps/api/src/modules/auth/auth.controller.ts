@@ -1,86 +1,72 @@
 import type { Request, Response } from 'express';
+import { authService } from './auth.service.js';
 import { logger } from '../../config/logger.js';
+import { formatResponse, formatError } from '../../utils/index.js';
 
 export const authController = {
   login: async (req: Request, res: Response) => {
     try {
-      // TODO: Implement login with Supabase Auth
-      const { email, password: _password } = req.body;
+      const { email, password } = req.body;
       logger.info(`Login attempt for: ${email}`);
 
-      res.json({
-        success: true,
-        data: {
-          token: 'mock-jwt-token',
-          refreshToken: 'mock-refresh-token',
-          user: { id: '1', email, name: 'Dev User', role: 'SUPER_ADMIN' },
-        },
-        timestamp: new Date().toISOString(),
-      });
+      const result = await authService.login({ email, password });
+      res.json(formatResponse(result, 'Login successful'));
     } catch (error) {
-      logger.error('Login error:', error);
-      res.status(500).json({
-        success: false,
-        error: { code: 'AUTH_ERROR', message: 'Login failed' },
-        timestamp: new Date().toISOString(),
-      });
+      const msg = error instanceof Error ? error.message : 'Login failed';
+      logger.warn('Login failed:', { error: msg });
+      res.status(401).json(formatError('AUTH_INVALID_CREDENTIALS', msg));
     }
   },
 
   register: async (req: Request, res: Response) => {
     try {
-      // TODO: Implement registration with Supabase Auth
-      const { email, name } = req.body;
-      logger.info(`Registration for: ${email}`);
+      const { email, password, name, role } = req.body;
+      logger.info(`Registration request for: ${email}`);
 
-      res.status(201).json({
-        success: true,
-        data: { id: '1', email, name, role: 'VIEWER' },
-        timestamp: new Date().toISOString(),
-      });
+      const result = await authService.register({ email, password, name, role });
+      res.status(201).json(formatResponse(result, 'Registration successful'));
     } catch (error) {
-      logger.error('Registration error:', error);
-      res.status(500).json({
-        success: false,
-        error: { code: 'AUTH_ERROR', message: 'Registration failed' },
-        timestamp: new Date().toISOString(),
-      });
+      const msg = error instanceof Error ? error.message : 'Registration failed';
+      logger.error('Registration error:', { error: msg });
+      const status = msg.includes('already exists') ? 409 : 400;
+      res.status(status).json(formatError('REGISTRATION_FAILED', msg));
     }
   },
 
   logout: async (_req: Request, res: Response) => {
-    res.json({
-      success: true,
-      data: null,
-      message: 'Logged out successfully',
-      timestamp: new Date().toISOString(),
-    });
+    res.json(formatResponse(null, 'Logged out successfully'));
   },
 
-  refresh: async (_req: Request, res: Response) => {
+  refresh: async (req: Request, res: Response) => {
     try {
-      // TODO: Implement token refresh
-      res.json({
-        success: true,
-        data: { token: 'new-mock-jwt-token', refreshToken: 'new-mock-refresh-token' },
-        timestamp: new Date().toISOString(),
-      });
+      const { refreshToken } = req.body;
+      const result = await authService.refresh(refreshToken);
+      res.json(formatResponse(result, 'Token refreshed successfully'));
     } catch (error) {
-      logger.error('Token refresh error:', error);
-      res.status(500).json({
-        success: false,
-        error: { code: 'AUTH_ERROR', message: 'Token refresh failed' },
-        timestamp: new Date().toISOString(),
-      });
+      const msg = error instanceof Error ? error.message : 'Token refresh failed';
+      logger.warn('Token refresh failed:', { error: msg });
+      res.status(401).json(formatError('TOKEN_REFRESH_FAILED', msg));
     }
   },
 
   me: async (req: Request, res: Response) => {
-    const user = (req as any).user;
-    res.json({
-      success: true,
-      data: user,
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      const user = req.user;
+      if (!user) {
+        res.status(401).json(formatError('UNAUTHORIZED', 'Authentication required'));
+        return;
+      }
+
+      const profile = await authService.me(user.id);
+      if (!profile) {
+        res.status(404).json(formatError('NOT_FOUND', 'User profile not found'));
+        return;
+      }
+
+      res.json(formatResponse(profile));
+    } catch (error) {
+      logger.error('Fetch profile error:', error);
+      res.status(500).json(formatError('INTERNAL_ERROR', 'Failed to retrieve profile'));
+    }
   },
 };

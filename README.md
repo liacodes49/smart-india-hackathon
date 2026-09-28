@@ -58,4 +58,4 @@ smart-india-hackathon/
 ## 📖 For the Team!
 Please read the highly detailed layman's guide inside the docs folder to understand exactly how our code is structured and the rules we must follow.
 
-👉 **[Read the Team Onboarding Guide](./docs/TEAM_ONBOARDING.md)**
+👉 **[Read the Team Onboarding Guide](./docs/`TEAM_ONBOARDING`.md)**

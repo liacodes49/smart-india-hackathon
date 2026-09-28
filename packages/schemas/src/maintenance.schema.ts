@@ -14,7 +14,7 @@ export const createMaintenanceSchema = z.object({
 export type CreateMaintenanceInput = z.infer<typeof createMaintenanceSchema>;
 
 export const updateMaintenanceSchema = createMaintenanceSchema.partial().extend({
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD']).optional(),
+  status: z.enum(['RECOMMENDED', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD']).optional(),
   completedDate: z.string().datetime().optional(),
 });
 export type UpdateMaintenanceInput = z.infer<typeof updateMaintenanceSchema>;
@@ -24,7 +24,7 @@ export const maintenanceQuerySchema = z.object({
   assetId: z.string().uuid().optional(),
   type: z.enum(['PREVENTIVE', 'CORRECTIVE', 'PREDICTIVE', 'EMERGENCY']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD']).optional(),
+  status: z.enum(['RECOMMENDED', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'ON_HOLD']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });

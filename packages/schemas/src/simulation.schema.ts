@@ -33,3 +33,17 @@ export const simulationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type SimulationQueryInput = z.infer<typeof simulationQuerySchema>;
+
+export const quickRunSimulationSchema = z.object({
+  stationId: z.string().uuid(),
+  type: z.enum([
+    'POWER_FAILURE',
+    'EQUIPMENT_FAILURE',
+    'WEATHER_EXTREME',
+    'EVACUATION',
+    'SUPPLY_SHORTAGE',
+    'CUSTOM',
+  ]),
+  parameters: z.record(z.unknown()),
+});
+export type QuickRunSimulationInput = z.infer<typeof quickRunSimulationSchema>;

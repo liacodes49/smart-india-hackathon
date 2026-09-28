@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./types": "./src/types/index.ts",
     "./enums": "./src/enums/index.ts",
-    "./constants": "./src/constants/index.ts"
+    "./constants": "./src/constants/index.ts",
+    "./events": "./src/events/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

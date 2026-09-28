@@ -5,6 +5,8 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   role: UserRole;
+  name?: string;
+  stationId?: string | null;
 }
 
 declare global {

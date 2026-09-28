@@ -101,11 +101,86 @@ export enum MaintenancePriority {
 
 /** Maintenance work order status */
 export enum MaintenanceStatus {
+  RECOMMENDED = 'RECOMMENDED',
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
   ON_HOLD = 'ON_HOLD',
+}
+
+/** Data provenance tracking source of observation or prediction */
+export enum DataProvenance {
+  SIMULATED = 'SIMULATED',
+  SENSOR = 'SENSOR',
+  EXTERNAL_API = 'EXTERNAL_API',
+  MANUAL = 'MANUAL',
+  EDGE_SYNC = 'EDGE_SYNC',
+}
+
+/** Operational connectivity states for edge station nodes */
+export enum ConnectivityState {
+  ONLINE = 'ONLINE',
+  DEGRADED = 'DEGRADED',
+  BLACKOUT = 'BLACKOUT',
+}
+
+/** Synchronization status for edge batches and outbox records */
+export enum SyncStatus {
+  PENDING = 'PENDING',
+  SYNCING = 'SYNCING',
+  SYNCED = 'SYNCED',
+  FAILED = 'FAILED',
+  CONFLICT = 'CONFLICT',
+}
+
+/** Supported industrial ingestion gateway protocols */
+export enum GatewayProtocol {
+  REST = 'REST',
+  MQTT = 'MQTT',
+  MODBUS = 'MODBUS',
+  MANUAL = 'MANUAL',
+}
+
+/** Formal NCPOR expedition report types */
+export enum ReportType {
+  DAILY_SITREP = 'DAILY_SITREP',
+  WEEKLY_ENERGY = 'WEEKLY_ENERGY',
+  FUEL_AUDIT = 'FUEL_AUDIT',
+  INCIDENT_SUMMARY = 'INCIDENT_SUMMARY',
+}
+
+/** Supported report export file formats */
+export enum ReportFormat {
+  JSON = 'JSON',
+  CSV = 'CSV',
+}
+
+/** Operational risk levels */
+export enum RiskLevel {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL',
+}
+
+/** Standard prediction horizons */
+export enum PredictionHorizon {
+  ONE_HOUR = '1h',
+  SIX_HOURS = '6h',
+  TWENTY_FOUR_HOURS = '24h',
+  SEVEN_DAYS = '7d',
+  THIRTY_DAYS = '30d',
+}
+
+/** Polar weather conditions */
+export enum WeatherCondition {
+  CLEAR = 'CLEAR',
+  PARTLY_CLOUDY = 'PARTLY_CLOUDY',
+  OVERCAST = 'OVERCAST',
+  SNOW = 'SNOW',
+  BLIZZARD = 'BLIZZARD',
+  KATABATIC_GALE = 'KATABATIC_GALE',
 }
 
 /** Prediction model types */
@@ -159,4 +234,53 @@ export enum AuditAction {
   ACKNOWLEDGE_ALERT = 'ACKNOWLEDGE_ALERT',
   RUN_SIMULATION = 'RUN_SIMULATION',
   EXPORT_REPORT = 'EXPORT_REPORT',
+}
+
+/** Asset criticality levels */
+export enum AssetCriticality {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL',
+}
+
+/** Inventory & Resource categories */
+export enum InventoryCategory {
+  FUEL = 'FUEL',
+  FOOD = 'FOOD',
+  WATER = 'WATER',
+  MEDICAL = 'MEDICAL',
+  SPARE_PARTS = 'SPARE_PARTS',
+  CONSUMABLES = 'CONSUMABLES',
+}
+
+/** Operational incident severity levels */
+export enum IncidentSeverity {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL',
+}
+
+/** Operational incident lifecycle status */
+export enum IncidentStatus {
+  OPEN = 'OPEN',
+  ASSIGNED = 'ASSIGNED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  RESOLVED = 'RESOLVED',
+  CLOSED = 'CLOSED',
+}
+
+/** 3D Spatial Digital Twin health status color codes */
+export enum SpatialHealthColor {
+  GREEN = 'GREEN',   // Pristine / Normal (Health >= 80, no active alerts)
+  YELLOW = 'YELLOW', // Caution / Warning (Health 50-79, warning alert)
+  RED = 'RED',       // Critical / Breach (Health < 50, critical alert)
+}
+
+/** Provenance of 3D spatial positioning data */
+export enum SpatialProvenance {
+  CONFIGURED = 'CONFIGURED', // Explicit measured Cartesian coordinate
+  DERIVED = 'DERIVED',       // Inferred from parent building / zone layout
+  DEFAULT = 'DEFAULT',       // Deterministic synthetic fallback offset
 }
