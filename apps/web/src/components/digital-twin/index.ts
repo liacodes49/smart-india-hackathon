@@ -1,2 +1,1 @@
-// Digital Twin 3D components: scene, viewer, controls
-export {};
+export { default as AntarcticaOverview } from "./AntarcticaOverview";
