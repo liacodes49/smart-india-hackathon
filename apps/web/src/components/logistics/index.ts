@@ -1,0 +1,1 @@
+export { LogisticsView } from './LogisticsView';

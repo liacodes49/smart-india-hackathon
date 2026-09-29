@@ -1,8 +1,12 @@
+import React from "react";
+import type { Metadata } from "next";
+import { MaintenanceManagement } from "@/components/maintenance";
+
+export const metadata: Metadata = {
+  title: "Predictive Maintenance — NCPOR Antarctic Command Centre",
+  description: "Antarctic station equipment health, failure probability predictions, and maintenance tasks",
+};
+
 export default function MaintenancePage() {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Maintenance</h1>
-      {/* TODO: Work orders, scheduling, asset health */}
-    </div>
-  );
+  return <MaintenanceManagement />;
 }

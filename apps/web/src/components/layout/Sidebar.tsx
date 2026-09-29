@@ -16,6 +16,8 @@ import {
   ChevronRight,
   Radio,
   BarChart3,
+  Truck,
+  Package,
 } from "lucide-react";
 
 interface NavItem {
@@ -59,6 +61,16 @@ const NAV_ITEMS: NavItem[] = [
     label: "Simulation",
     href: "/simulation",
     icon: Sliders,
+  },
+  {
+    label: "Logistics",
+    href: "/logistics",
+    icon: Truck,
+  },
+  {
+    label: "Inventory",
+    href: "/inventory",
+    icon: Package,
   },
   {
     label: "Maintenance",
