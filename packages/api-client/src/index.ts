@@ -20,7 +20,7 @@ import { createAnalyticsApi } from './analytics';
 import { createMaintenanceApi } from './maintenance';
 import { createSensorsApi } from './sensors';
 
-export { ApiClient } from './client';
+export { ApiClient, ApiClientError } from './client';
 export type { ClientConfig } from './client';
 
 export { createStationsApi } from './stations';
@@ -39,7 +39,6 @@ export { createGatewayApi } from './gateway';
 export { createAnalyticsApi } from './analytics';
 export { createMaintenanceApi } from './maintenance';
 export { createSensorsApi } from './sensors';
-
 
 /**
  * Unified Typed Antarctic Digital Twin Client SDK
@@ -84,8 +83,6 @@ export class AntarcticTwinClient {
     this.maintenance = createMaintenanceApi(this.client);
     this.sensors = createSensorsApi(this.client);
   }
-
-
 
   setToken(token: string): void {
     this.client.setToken(token);

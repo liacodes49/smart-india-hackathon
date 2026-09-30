@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
-import { useStationStore, type CameraPreset, type ViewMode } from "@/stores/useStationStore";
-import { useAuthStore } from "@/stores/useAuthStore";
-import { StationId } from "@repo/shared/enums";
-import AntarcticaOverview from "@/components/digital-twin/AntarcticaOverview";
+import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api';
+import { useStationStore, type CameraPreset, type ViewMode } from '@/stores/useStationStore';
+import { useAuthStore } from '@/stores/useAuthStore';
+import type { StationId } from '@repo/shared/enums';
+import AntarcticaOverview from '@/components/digital-twin/AntarcticaOverview';
 import {
   Radio,
   Wifi,
@@ -34,18 +34,22 @@ import {
   Home,
   Truck,
   Cpu,
-} from "lucide-react";
+} from 'lucide-react';
 
 interface StationEdgeConsoleProps {
-  stationId: "MAITRI" | "BHARATI";
+  stationId: 'MAITRI' | 'BHARATI';
 }
 
-const CAMERA_PRESETS: { id: CameraPreset; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "OVERVIEW", label: "Overview", icon: Eye },
-  { id: "POWER", label: "Power", icon: Zap },
-  { id: "FUEL", label: "Fuel", icon: Fuel },
-  { id: "HABITAT", label: "Habitat", icon: Home },
-  { id: "LOGISTICS", label: "Logistics", icon: Truck },
+const CAMERA_PRESETS: {
+  id: CameraPreset;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { id: 'OVERVIEW', label: 'Overview', icon: Eye },
+  { id: 'POWER', label: 'Power', icon: Zap },
+  { id: 'FUEL', label: 'Fuel', icon: Fuel },
+  { id: 'HABITAT', label: 'Habitat', icon: Home },
+  { id: 'LOGISTICS', label: 'Logistics', icon: Truck },
 ];
 
 export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
@@ -67,7 +71,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
   }, [stationId, setActiveStation]);
 
   // Active dock tab: "TX" (Data Transmitted to HQ) vs "RX" (Directives Received from HQ)
-  const [activeDockTab, setActiveDockTab] = useState<"TX" | "RX">("TX");
+  const [activeDockTab, setActiveDockTab] = useState<'TX' | 'RX'>('TX');
 
   // Local Station Edge Telemetry Controls (Interactive Sliders)
   const [gen1Temp, setGen1Temp] = useState<number>(76);
@@ -91,19 +95,26 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
   const [sensors, setSensors] = useState<any[]>([]);
 
   // Station Metadata
-  const stationName = stationId === "MAITRI" ? "Maitri Research Station" : "Bharati Research Station";
-  const stationCoords = stationId === "MAITRI" ? "70°46′S 11°44′E (Schirmacher Oasis)" : "69°24′S 76°11′E (Larsemann Hills)";
-  const stationTheme = stationId === "MAITRI" ? "cyan" : "blue";
+  const stationName =
+    stationId === 'MAITRI' ? 'Maitri Research Station' : 'Bharati Research Station';
+  const stationCoords =
+    stationId === 'MAITRI'
+      ? '70°46′S 11°44′E (Schirmacher Oasis)'
+      : '69°24′S 76°11′E (Larsemann Hills)';
+  const stationTheme = stationId === 'MAITRI' ? 'cyan' : 'blue';
 
   // Load sensors for this station
   useEffect(() => {
-    apiClient.sensors.list({ stationId }).then((res: any) => {
-      if (res?.data && Array.isArray(res.data)) {
-        setSensors(res.data);
-      }
-    }).catch((err) => {
-      console.warn("Could not preload station sensors:", err);
-    });
+    apiClient.sensors
+      .list({ stationId })
+      .then((res: any) => {
+        if (res?.data && Array.isArray(res.data)) {
+          setSensors(res.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not preload station sensors:', err);
+      });
   }, [stationId]);
 
   // Fetch Directives & Work Orders from HQ
@@ -117,7 +128,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
       setWorkOrders((woRes as any)?.data || []);
       setAlerts((alertsRes as any)?.data || []);
     } catch (err) {
-      console.warn("Could not fetch HQ directives:", err);
+      console.warn('Could not fetch HQ directives:', err);
     } finally {
       setLoadingOrders(false);
     }
@@ -134,16 +145,33 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
     try {
       setIsTransmitting(true);
 
-      // Multi-strategy sensor match:
-      // 1) Name substring match  2) Exact unit match  3) No match → skip ingest
-      const normalizeUnit = (u: string) => u.replace(/[^a-zA-Z0-9%°]/g, "").toLowerCase();
+      const normalizeUnit = (u: string) => u.replace(/[^a-zA-Z0-9%°]/g, '').toLowerCase();
       const targetUnit = normalizeUnit(unit);
 
-      const target = sensors.find(
+      // Strategy 1: Find sensor matching both metric name substring AND unit
+      let target = sensors.find(
         (s) =>
-          s.name.toLowerCase().includes(metricName.toLowerCase()) ||
-          normalizeUnit(s.unit) === targetUnit
+          s.name.toLowerCase().includes(metricName.toLowerCase()) &&
+          normalizeUnit(s.unit) === targetUnit,
       );
+
+      // Strategy 2: If no exact name+unit match, match by unit and keyword overlap
+      if (!target) {
+        const keywords = metricName.toLowerCase().split(/\s+/);
+        target = sensors.find(
+          (s) =>
+            normalizeUnit(s.unit) === targetUnit &&
+            keywords.some((k) => s.name.toLowerCase().includes(k)),
+        );
+      }
+
+      // Strategy 3: Match purely by exact unit if unambiguous
+      if (!target) {
+        const matchingByUnit = sensors.filter((s) => normalizeUnit(s.unit) === targetUnit);
+        if (matchingByUnit.length === 1) {
+          target = matchingByUnit[0];
+        }
+      }
 
       if (target) {
         await apiClient.telemetry.ingest({
@@ -152,36 +180,53 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
           timestamp: new Date().toISOString(),
           value,
           unit: target.unit, // always use the registered sensor unit
-          status: value >= (target.criticalThreshold ?? 90) ? "CRITICAL" : value >= (target.warningThreshold ?? 80) ? "WARNING" : "NORMAL",
+          status:
+            value >= (target.criticalThreshold ?? 90)
+              ? 'CRITICAL'
+              : value >= (target.warningThreshold ?? 80)
+                ? 'WARNING'
+                : 'NORMAL',
           quality: 100,
         });
         const logEntry = `[TX → GOA HQ]: ${metricName} = ${value} ${unit} (ACK via ${target.name})`;
         setTxLogs((prev) => [logEntry, ...prev.slice(0, 15)]);
       } else {
-        // No matching sensor in registry — log locally only, do not call API
-        const logEntry = `[TX LOCAL]: ${metricName} = ${value} ${unit} (no matching sensor — local record only)`;
+        // No matching sensor with compatible unit — log locally only, do not call API
+        const logEntry = `[TX LOCAL]: ${metricName} = ${value} ${unit} (no compatible ${unit} sensor registered — local record only)`;
         setTxLogs((prev) => [logEntry, ...prev.slice(0, 15)]);
       }
 
       useStationStore.getState().recordTelemetryTick();
     } catch (err: any) {
-      const errMsg = err?.message || err?.error?.message || (typeof err === "string" ? err : "Sensor transmission error");
-      console.error("Sensor transmission failed:", errMsg, err);
-      setTxLogs((prev) => [`[TX ERROR]: Failed to push ${metricName}: ${errMsg}`, ...prev.slice(0, 15)]);
+      const errMsg =
+        err?.message ||
+        err?.error?.message ||
+        (typeof err === 'string' ? err : 'Sensor transmission error');
+      console.error('Sensor transmission failed:', errMsg, err);
+      setTxLogs((prev) => [
+        `[TX ERROR]: Failed to push ${metricName}: ${errMsg}`,
+        ...prev.slice(0, 15),
+      ]);
     } finally {
       setIsTransmitting(false);
     }
   };
 
-
   // Push One-Touch Crisis Anomaly Scenario
-  const handleTriggerAnomaly = async (scenario: "GEN_CRITICAL" | "FREEZE_WATER" | "BLIZZARD_SURGE") => {
+  const handleTriggerAnomaly = async (
+    scenario: 'GEN_CRITICAL' | 'FREEZE_WATER' | 'BLIZZARD_SURGE',
+  ) => {
     try {
       setIsTransmitting(true);
-      if (scenario === "GEN_CRITICAL") {
+      const normalizeUnit = (u: string) => u.replace(/[^a-zA-Z0-9%°]/g, '').toLowerCase();
+
+      if (scenario === 'GEN_CRITICAL') {
         setGen1Temp(94.5);
         setGenPowerKw(145);
-        const sensor = sensors.find((s) => s.type === "TEMPERATURE" || s.name.toLowerCase().includes("coolant")) || sensors[0];
+        const sensor =
+          sensors.find(
+            (s) => s.type === 'TEMPERATURE' && s.name.toLowerCase().includes('coolant'),
+          ) || sensors.find((s) => s.type === 'TEMPERATURE');
         if (sensor) {
           await apiClient.telemetry.ingest({
             sensorId: sensor.id,
@@ -189,7 +234,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
             timestamp: new Date().toISOString(),
             value: 94.5,
             unit: sensor.unit,
-            status: "CRITICAL",
+            status: 'CRITICAL',
             quality: 100,
           });
         }
@@ -197,9 +242,17 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
           `[🚨 EMERGENCY TX]: CRITICAL Coolant Overheat Injected (94.5°C) → Dispatched to HQ!`,
           ...prev.slice(0, 15),
         ]);
-      } else if (scenario === "FREEZE_WATER") {
+      } else if (scenario === 'FREEZE_WATER') {
         setWaterPressureBar(0.2);
-        const sensor = sensors.find((s) => s.name.toLowerCase().includes("pressure") || s.name.toLowerCase().includes("water")) || sensors[1] || sensors[0];
+        const sensor =
+          sensors.find(
+            (s) =>
+              (s.name.toLowerCase().includes('water') ||
+                s.type === 'WATER' ||
+                s.name.toLowerCase().includes('pump')) &&
+              !s.name.toLowerCase().includes('atmospheric') &&
+              normalizeUnit(s.unit) !== 'hpa',
+          ) || sensors.find((s) => s.type === 'WATER');
         if (sensor) {
           await apiClient.telemetry.ingest({
             sensorId: sensor.id,
@@ -207,7 +260,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
             timestamp: new Date().toISOString(),
             value: 0.2,
             unit: sensor.unit,
-            status: "WARNING",
+            status: 'WARNING',
             quality: 100,
           });
         }
@@ -215,9 +268,15 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
           `[⚠️ WARNING TX]: Water Line Freeze / Flow Blockage Injected (0.2 bar) → Dispatched to HQ!`,
           ...prev.slice(0, 15),
         ]);
-      } else if (scenario === "BLIZZARD_SURGE") {
+      } else if (scenario === 'BLIZZARD_SURGE') {
         setIndoorTemp(12.0);
-        const sensor = sensors.find((s) => s.name.toLowerCase().includes("temp") || s.name.toLowerCase().includes("ambient")) || sensors[0];
+        const sensor =
+          sensors.find(
+            (s) =>
+              s.type === 'TEMPERATURE' &&
+              (s.name.toLowerCase().includes('interior') ||
+                s.name.toLowerCase().includes('ambient')),
+          ) || sensors.find((s) => s.type === 'TEMPERATURE');
         if (sensor) {
           await apiClient.telemetry.ingest({
             sensorId: sensor.id,
@@ -225,7 +284,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
             timestamp: new Date().toISOString(),
             value: 12.0,
             unit: sensor.unit,
-            status: "WARNING",
+            status: 'WARNING',
             quality: 100,
           });
         }
@@ -237,7 +296,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
       useStationStore.getState().recordTelemetryTick();
       fetchHQDirectives();
     } catch (err: any) {
-      console.error("Failed to inject anomaly:", err);
+      console.error('Failed to inject anomaly:', err);
     } finally {
       setIsTransmitting(false);
     }
@@ -248,9 +307,9 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
     try {
       setActionLoading(orderId);
       await apiClient.maintenance.update(orderId, {
-        status: "COMPLETED",
+        status: 'COMPLETED',
         completedDate: new Date().toISOString(),
-        notes: `Executed on-site by ${user?.name || "Station Operator"} at ${stationId}.`,
+        notes: `Executed on-site by ${user?.name || 'Station Operator'} at ${stationId}.`,
       });
       fetchHQDirectives();
       useStationStore.getState().recordTelemetryTick();
@@ -259,7 +318,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
         ...prev.slice(0, 15),
       ]);
     } catch (err: any) {
-      console.error("Failed to complete order:", err);
+      console.error('Failed to complete order:', err);
     } finally {
       setActionLoading(null);
     }
@@ -292,20 +351,22 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
               <span className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
                 GSAT-7A UPLINK ACTIVE
               </span>
-              <span className="text-[9.5px] text-slate-400 hidden sm:inline">• Latency: 64ms • Goa HQ Connected</span>
+              <span className="text-[9.5px] text-slate-400 hidden sm:inline">
+                • Latency: 64ms • Goa HQ Connected
+              </span>
             </div>
           </div>
 
           {/* User Badge & Switch Terminal */}
           <div className="flex items-center gap-2">
             <span className="text-[10.5px] text-slate-300 hidden md:inline">
-              Op: <strong>{user?.name || "Station Commander"}</strong>
+              Op: <strong>{user?.name || 'Station Commander'}</strong>
             </span>
             <button
               type="button"
               onClick={() => {
                 logout();
-                router.push("/login");
+                router.push('/login');
               }}
               className="p-2 rounded-xl bg-[#040810] border border-white/[0.08] text-slate-400 hover:text-rose-400 cursor-pointer transition-all"
               title="Switch Terminal or Log Out"
@@ -341,8 +402,8 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                     onClick={() => setCameraPreset(p.id)}
                     className={`flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-semibold transition-all cursor-pointer ${
                       active
-                        ? "bg-cyan-950 text-cyan-200 border border-cyan-500/50 shadow-[0_0_8px_rgba(6,182,212,0.2)]"
-                        : "text-slate-400 hover:text-slate-200"
+                        ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/50 shadow-[0_0_8px_rgba(6,182,212,0.2)]'
+                        : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     <Icon className="w-2.5 h-2.5" />
@@ -354,15 +415,15 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
 
             {/* View Modes */}
             <div className="flex items-center gap-1 rounded-lg border border-white/[0.08] bg-slate-950/80 p-0.5">
-              {(["NORMAL", "ENERGY", "RISK", "LOGISTICS"] as ViewMode[]).map((vm) => (
+              {(['NORMAL', 'ENERGY', 'RISK', 'LOGISTICS'] as ViewMode[]).map((vm) => (
                 <button
                   key={vm}
                   type="button"
                   onClick={() => setViewMode(vm)}
                   className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
                     viewMode === vm
-                      ? "bg-cyan-950 text-cyan-300 border border-cyan-500/40"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   {vm}
@@ -373,10 +434,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
 
           {/* 3D Canvas Viewport */}
           <div className="flex-1 relative w-full h-full min-h-[400px]">
-            <AntarcticaOverview
-              embedded={true}
-              initialStationId={stationId}
-            />
+            <AntarcticaOverview embedded={true} initialStationId={stationId} />
           </div>
         </div>
 
@@ -386,11 +444,11 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
           <div className="flex items-center p-1 rounded-xl bg-[#080d16] border border-white/[0.08]">
             <button
               type="button"
-              onClick={() => setActiveDockTab("TX")}
+              onClick={() => setActiveDockTab('TX')}
               className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                activeDockTab === "TX"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/50 shadow-[0_0_12px_rgba(6,182,212,0.2)]"
-                  : "text-slate-400 hover:text-slate-200"
+                activeDockTab === 'TX'
+                  ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/50 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <ArrowUpRight className="w-3.5 h-3.5 text-cyan-400" />
@@ -399,11 +457,11 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
 
             <button
               type="button"
-              onClick={() => setActiveDockTab("RX")}
+              onClick={() => setActiveDockTab('RX')}
               className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                activeDockTab === "RX"
-                  ? "bg-amber-950 text-amber-200 border border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
-                  : "text-slate-400 hover:text-slate-200"
+                activeDockTab === 'RX'
+                  ? 'bg-amber-950 text-amber-200 border border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -412,7 +470,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
           </div>
 
           {/* TAB 1: DATA TRANSMITTED TO HQ (Interactive Edge SCADA Sensor Deck) */}
-          {activeDockTab === "TX" && (
+          {activeDockTab === 'TX' && (
             <div className="flex-1 flex flex-col gap-3 p-4 rounded-2xl bg-[#080d16]/95 border border-white/[0.08] backdrop-blur-md overflow-y-auto max-h-[620px]">
               <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
@@ -448,7 +506,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                     <span>Nominal: 70-82°C</span>
                     <button
                       type="button"
-                      onClick={() => handleTransmitReading("Coolant Temperature", gen1Temp, "°C")}
+                      onClick={() => handleTransmitReading('Coolant Temperature', gen1Temp, '°C')}
                       className="px-2 py-0.5 rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 font-bold text-[9px] flex items-center gap-1 cursor-pointer transition-all"
                     >
                       <Send className="w-2.5 h-2.5" />
@@ -479,7 +537,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                     <span>Rated: 125 kW</span>
                     <button
                       type="button"
-                      onClick={() => handleTransmitReading("Power Demand", genPowerKw, "kW")}
+                      onClick={() => handleTransmitReading('Power Demand', genPowerKw, 'kW')}
                       className="px-2 py-0.5 rounded bg-amber-950 hover:bg-amber-900 border border-amber-500/40 text-amber-300 font-bold text-[9px] flex items-center gap-1 cursor-pointer transition-all"
                     >
                       <Send className="w-2.5 h-2.5" />
@@ -510,7 +568,9 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                     <span>Operating: 3.5 - 4.2 bar</span>
                     <button
                       type="button"
-                      onClick={() => handleTransmitReading("Water Pressure", waterPressureBar, "bar")}
+                      onClick={() =>
+                        handleTransmitReading('Water Pressure', waterPressureBar, 'bar')
+                      }
                       className="px-2 py-0.5 rounded bg-blue-950 hover:bg-blue-900 border border-blue-500/40 text-blue-300 font-bold text-[9px] flex items-center gap-1 cursor-pointer transition-all"
                     >
                       <Send className="w-2.5 h-2.5" />
@@ -528,7 +588,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => handleTriggerAnomaly("GEN_CRITICAL")}
+                    onClick={() => handleTriggerAnomaly('GEN_CRITICAL')}
                     className="p-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/50 text-rose-200 text-[10px] font-bold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all text-center"
                   >
                     <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
@@ -537,7 +597,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
 
                   <button
                     type="button"
-                    onClick={() => handleTriggerAnomaly("FREEZE_WATER")}
+                    onClick={() => handleTriggerAnomaly('FREEZE_WATER')}
                     className="p-2 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/50 text-amber-200 text-[10px] font-bold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all text-center"
                   >
                     <Droplets className="w-3.5 h-3.5 text-amber-400" />
@@ -546,7 +606,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
 
                   <button
                     type="button"
-                    onClick={() => handleTriggerAnomaly("BLIZZARD_SURGE")}
+                    onClick={() => handleTriggerAnomaly('BLIZZARD_SURGE')}
                     className="p-2 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/50 text-cyan-200 text-[10px] font-bold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all text-center"
                   >
                     <Thermometer className="w-3.5 h-3.5 text-cyan-400" />
@@ -565,11 +625,11 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                     <div
                       key={idx}
                       className={
-                        log.includes("🚨") || log.includes("CRITICAL")
-                          ? "text-rose-400 font-bold"
-                          : log.includes("⚠️")
-                          ? "text-amber-300"
-                          : "text-slate-300"
+                        log.includes('🚨') || log.includes('CRITICAL')
+                          ? 'text-rose-400 font-bold'
+                          : log.includes('⚠️')
+                            ? 'text-amber-300'
+                            : 'text-slate-300'
                       }
                     >
                       {log}
@@ -581,7 +641,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
           )}
 
           {/* TAB 2: DATA RECEIVED FROM HQ (Directives, Work Orders & AI Advisories) */}
-          {activeDockTab === "RX" && (
+          {activeDockTab === 'RX' && (
             <div className="flex-1 flex flex-col gap-3 p-4 rounded-2xl bg-[#080d16]/95 border border-white/[0.08] backdrop-blur-md overflow-y-auto max-h-[620px]">
               <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
@@ -596,19 +656,21 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
               {/* Active Alerts for this station */}
               <div>
                 <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1.5">
-                  Active Station Alarms ({alerts.filter((a) => a.status === "ACTIVE").length}):
+                  Active Station Alarms ({alerts.filter((a) => a.status === 'ACTIVE').length}):
                 </span>
                 {alerts.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 italic">No active alarms at this station.</p>
+                  <p className="text-[11px] text-slate-500 italic">
+                    No active alarms at this station.
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     {alerts.slice(0, 3).map((a) => (
                       <div
                         key={a.id}
                         className={`p-2.5 rounded-xl border text-xs ${
-                          a.severity === "CRITICAL"
-                            ? "bg-rose-950/30 border-rose-500/40 text-rose-200"
-                            : "bg-amber-950/30 border-amber-500/40 text-amber-200"
+                          a.severity === 'CRITICAL'
+                            ? 'bg-rose-950/30 border-rose-500/40 text-rose-200'
+                            : 'bg-amber-950/30 border-amber-500/40 text-amber-200'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-1 mb-1">
@@ -630,11 +692,16 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                   HQ Maintenance Orders & Dispatches:
                 </span>
                 {workOrders.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 italic">No pending work orders from HQ.</p>
+                  <p className="text-[11px] text-slate-500 italic">
+                    No pending work orders from HQ.
+                  </p>
                 ) : (
                   <div className="space-y-2.5">
                     {workOrders.map((wo) => {
-                      const isPending = wo.status === "PENDING" || wo.status === "RECOMMENDED" || wo.status === "IN_PROGRESS";
+                      const isPending =
+                        wo.status === 'PENDING' ||
+                        wo.status === 'RECOMMENDED' ||
+                        wo.status === 'IN_PROGRESS';
                       return (
                         <div
                           key={wo.id}
@@ -645,9 +712,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                               <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40">
                                 {wo.priority} PRIORITY
                               </span>
-                              <span className="text-[9.5px] text-slate-500">
-                                {wo.status}
-                              </span>
+                              <span className="text-[9.5px] text-slate-500">{wo.status}</span>
                             </div>
                             <h4 className="font-bold text-slate-100 text-[11px]">{wo.title}</h4>
                             <p className="text-[10px] text-slate-400 mt-0.5">{wo.description}</p>
@@ -661,7 +726,11 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
                               className="w-full py-1.5 px-2 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-all disabled:opacity-50"
                             >
                               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              <span>{actionLoading === wo.id ? "Syncing with HQ..." : "MARK COMPLETED ON-SITE"}</span>
+                              <span>
+                                {actionLoading === wo.id
+                                  ? 'Syncing with HQ...'
+                                  : 'MARK COMPLETED ON-SITE'}
+                              </span>
                             </button>
                           )}
                         </div>

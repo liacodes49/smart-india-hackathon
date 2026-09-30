@@ -10,6 +10,76 @@ export interface ClientConfig {
   onUnauthorized?: () => void;
 }
 
+export class ApiClientError extends Error {
+  code: string;
+  details?: unknown;
+  status: number;
+  apiError?: unknown;
+
+  constructor(
+    message: string,
+    status: number,
+    code: string = 'HTTP_ERROR',
+    details?: unknown,
+    apiError?: unknown,
+  ) {
+    super(message);
+    this.name = 'ApiClientError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+    this.apiError = apiError;
+
+    // Ensure enumerable properties so JSON serialization and console logs never display `{}`
+    Object.defineProperty(this, 'name', {
+      value: 'ApiClientError',
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(this, 'message', {
+      value: message,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(this, 'code', {
+      value: code,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(this, 'status', {
+      value: status,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    if (details !== undefined) {
+      Object.defineProperty(this, 'details', {
+        value: details,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+  }
+
+  override toString(): string {
+    return `[${this.code}] ${this.message}`;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+      status: this.status,
+      details: this.details,
+    };
+  }
+}
+
 export class ApiClient {
   private baseUrl: string;
   private token?: string;
@@ -76,8 +146,10 @@ export class ApiClient {
     }
 
     if (!response) {
-      throw new Error(
-        `API Connection Failed: Unable to reach ${method} ${url.toString()} (${lastError?.message || 'Network error'})`
+      throw new ApiClientError(
+        `API Connection Failed: Unable to reach ${method} ${url.toString()} (${lastError?.message || 'Network error'})`,
+        0,
+        'NETWORK_ERROR',
       );
     }
 
@@ -86,11 +158,11 @@ export class ApiClient {
     }
 
     if (!response.ok) {
-      let error: ApiError;
+      let payload: any;
       try {
-        error = (await response.json()) as ApiError;
+        payload = await response.json();
       } catch {
-        error = {
+        payload = {
           success: false,
           error: {
             code: 'HTTP_ERROR',
@@ -99,11 +171,25 @@ export class ApiClient {
           timestamp: new Date().toISOString(),
         };
       }
-      const errMsg = error.error?.message || `Request failed with status ${response.status}: ${response.statusText}`;
-      const apiErr = new Error(errMsg);
-      (apiErr as any).code = error.error?.code;
-      (apiErr as any).details = error.error?.details;
-      (apiErr as any).apiError = error;
+
+      const errCode =
+        payload?.error?.code ||
+        payload?.code ||
+        (response.status === 401
+          ? 'UNAUTHORIZED'
+          : response.status === 404
+            ? 'NOT_FOUND'
+            : 'HTTP_ERROR');
+
+      const errMsg =
+        payload?.error?.message ||
+        payload?.message ||
+        (typeof payload?.error === 'string' ? payload.error : null) ||
+        `Request failed with status ${response.status}: ${response.statusText}`;
+
+      const errDetails = payload?.error?.details || payload?.details;
+
+      const apiErr = new ApiClientError(errMsg, response.status, errCode, errDetails, payload);
       throw apiErr;
     }
 

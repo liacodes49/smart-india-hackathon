@@ -1,11 +1,12 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { apiClient } from "@/lib/api";
-import { useStationStore } from "@/stores/useStationStore";
-import { StationId } from "@repo/shared/enums";
+import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { apiClient } from '@/lib/api';
+import { useStationStore } from '@/stores/useStationStore';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { StationId } from '@repo/shared/enums';
 import {
   Bell,
   ShieldAlert,
@@ -22,7 +23,7 @@ import {
   Cpu,
   Wrench,
   X,
-} from "lucide-react";
+} from 'lucide-react';
 
 interface AlertItem {
   id: string;
@@ -31,8 +32,8 @@ interface AlertItem {
   assetId?: string | null;
   title: string;
   message: string;
-  severity: "INFO" | "WARNING" | "CRITICAL" | "EMERGENCY";
-  status: "ACTIVE" | "ACKNOWLEDGED" | "RESOLVED" | "ESCALATED" | "DISMISSED";
+  severity: 'INFO' | 'WARNING' | 'CRITICAL' | 'EMERGENCY';
+  status: 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED' | 'ESCALATED' | 'DISMISSED';
   category: string;
   createdAt: string;
   updatedAt: string;
@@ -41,29 +42,31 @@ interface AlertItem {
 
 export function AlertsManager() {
   const searchParams = useSearchParams();
-  const urlAssetId = searchParams.get("assetId");
-  const urlStationId = searchParams.get("stationId");
+  const urlAssetId = searchParams.get('assetId');
+  const urlStationId = searchParams.get('stationId');
 
   const activeStation = useStationStore((s) => s.activeStation);
   const setActiveStation = useStationStore((s) => s.setActiveStation);
 
-  const [selectedStation, setSelectedStation] = useState<string>(urlStationId || activeStation || "MAITRI");
+  const [selectedStation, setSelectedStation] = useState<string>(
+    urlStationId || activeStation || 'MAITRI',
+  );
   const [assetFilter, setAssetFilter] = useState<string | null>(urlAssetId || null);
   const [stationAssets, setStationAssets] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [severityFilter, setSeverityFilter] = useState<string>("ALL");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
-  const [operatorNotes, setOperatorNotes] = useState<string>("");
+  const [operatorNotes, setOperatorNotes] = useState<string>('');
 
   useEffect(() => {
     if (urlAssetId) {
       setAssetFilter(urlAssetId);
     }
-    if (urlStationId && (urlStationId === "MAITRI" || urlStationId === "BHARATI")) {
+    if (urlStationId && (urlStationId === 'MAITRI' || urlStationId === 'BHARATI')) {
       setSelectedStation(urlStationId);
     }
   }, [urlAssetId, urlStationId]);
@@ -80,13 +83,16 @@ export function AlertsManager() {
             seen.add(s.assetId);
             extracted.push({
               id: s.assetId,
-              name: s.asset?.name || s.name?.replace(/Sensor.*/i, "Equipment") || `Equipment ${s.assetId.slice(0, 8)}`,
+              name:
+                s.asset?.name ||
+                s.name?.replace(/Sensor.*/i, 'Equipment') ||
+                `Equipment ${s.assetId.slice(0, 8)}`,
             });
           }
         });
         setStationAssets(extracted);
       } catch (err) {
-        console.warn("Could not load assets for alerts:", err);
+        console.warn('Could not load assets for alerts:', err);
       }
     }
     loadAssets();
@@ -107,7 +113,7 @@ export function AlertsManager() {
       const alertData = (res as any)?.data || [];
       setAlerts(alertData);
     } catch (err: any) {
-      console.error("[AlertsManager] Error fetching alerts:", err);
+      console.error('[AlertsManager] Error fetching alerts:', err);
     } finally {
       setLoading(false);
     }
@@ -121,21 +127,22 @@ export function AlertsManager() {
 
   const handleStationChange = (station: string) => {
     setSelectedStation(station);
-    if (station === "MAITRI") setActiveStation(StationId.MAITRI);
-    else if (station === "BHARATI") setActiveStation(StationId.BHARATI);
+    if (station === 'MAITRI') setActiveStation(StationId.MAITRI);
+    else if (station === 'BHARATI') setActiveStation(StationId.BHARATI);
   };
 
   const handleAcknowledge = async (alertId: string) => {
     try {
       setActionLoading(alertId);
+      const authUser = useAuthStore.getState().user;
       await apiClient.alerts.acknowledge(alertId, {
-        acknowledgedBy: "00000000-0000-0000-0000-000000000000",
-        notes: operatorNotes || "Acknowledged by Station Operator",
+        acknowledgedBy: authUser?.id || undefined,
+        notes: operatorNotes || 'Acknowledged by Station Operator',
       });
       await fetchAlerts();
       setSelectedAlert(null);
     } catch (err: any) {
-      console.error("Failed to acknowledge alert:", err?.message || err);
+      console.error('Failed to acknowledge alert:', err?.message || err);
     } finally {
       setActionLoading(null);
     }
@@ -144,14 +151,15 @@ export function AlertsManager() {
   const handleResolve = async (alertId: string) => {
     try {
       setActionLoading(alertId);
+      const authUser = useAuthStore.getState().user;
       await apiClient.alerts.resolve(alertId, {
-        resolvedBy: "00000000-0000-0000-0000-000000000000",
-        notes: operatorNotes || "Resolved after subsystem inspection",
+        resolvedBy: authUser?.id || undefined,
+        notes: operatorNotes || 'Resolved after subsystem inspection',
       });
       await fetchAlerts();
       setSelectedAlert(null);
     } catch (err: any) {
-      console.error("Failed to resolve alert:", err?.message || err);
+      console.error('Failed to resolve alert:', err?.message || err);
     } finally {
       setActionLoading(null);
     }
@@ -159,17 +167,19 @@ export function AlertsManager() {
 
   const filteredAlerts = alerts.filter((a) => {
     if (assetFilter && a.assetId !== assetFilter) return false;
-    if (severityFilter !== "ALL" && a.severity !== severityFilter) return false;
-    if (statusFilter !== "ALL" && a.status !== statusFilter) return false;
-    if (searchQuery.trim() !== "") {
+    if (severityFilter !== 'ALL' && a.severity !== severityFilter) return false;
+    if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
+    if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
       return a.title.toLowerCase().includes(q) || a.message.toLowerCase().includes(q);
     }
     return true;
   });
 
-  const activeCount = alerts.filter((a) => a.status === "ACTIVE").length;
-  const criticalCount = alerts.filter((a) => a.severity === "CRITICAL" || a.severity === "EMERGENCY").length;
+  const activeCount = alerts.filter((a) => a.status === 'ACTIVE').length;
+  const criticalCount = alerts.filter(
+    (a) => a.severity === 'CRITICAL' || a.severity === 'EMERGENCY',
+  ).length;
 
   return (
     <div className="flex-1 flex flex-col gap-5 font-mono select-none pb-12">
@@ -202,27 +212,27 @@ export function AlertsManager() {
             className="p-2 rounded-xl bg-[#040810] border border-white/[0.08] text-slate-400 hover:text-cyan-400 cursor-pointer"
             title="Refresh Alerts"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-cyan-400" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
           </button>
           <div className="flex items-center p-1 rounded-xl bg-[#040810] border border-white/[0.08]">
             <button
               type="button"
-              onClick={() => handleStationChange("MAITRI")}
+              onClick={() => handleStationChange('MAITRI')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStation === "MAITRI"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  : "text-slate-400 hover:text-slate-200"
+                selectedStation === 'MAITRI'
+                  ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               MAITRI
             </button>
             <button
               type="button"
-              onClick={() => handleStationChange("BHARATI")}
+              onClick={() => handleStationChange('BHARATI')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStation === "BHARATI"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  : "text-slate-400 hover:text-slate-200"
+                selectedStation === 'BHARATI'
+                  ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               BHARATI
@@ -235,7 +245,9 @@ export function AlertsManager() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-[#080d16]/95 border border-white/[0.08] flex items-center justify-between">
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase block">Active Alerts</span>
+            <span className="text-[10px] text-slate-400 font-bold uppercase block">
+              Active Alerts
+            </span>
             <span className="text-2xl font-extrabold text-slate-100">{activeCount}</span>
           </div>
           <ShieldAlert className="w-6 h-6 text-rose-400" />
@@ -243,7 +255,9 @@ export function AlertsManager() {
 
         <div className="p-4 rounded-xl bg-[#080d16]/95 border border-white/[0.08] flex items-center justify-between">
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase block">Critical / Emergency</span>
+            <span className="text-[10px] text-slate-400 font-bold uppercase block">
+              Critical / Emergency
+            </span>
             <span className="text-2xl font-extrabold text-rose-400">{criticalCount}</span>
           </div>
           <AlertTriangle className="w-6 h-6 text-rose-500 animate-pulse" />
@@ -251,9 +265,11 @@ export function AlertsManager() {
 
         <div className="p-4 rounded-xl bg-[#080d16]/95 border border-white/[0.08] flex items-center justify-between">
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase block">Acknowledged</span>
+            <span className="text-[10px] text-slate-400 font-bold uppercase block">
+              Acknowledged
+            </span>
             <span className="text-2xl font-extrabold text-amber-300">
-              {alerts.filter((a) => a.status === "ACKNOWLEDGED").length}
+              {alerts.filter((a) => a.status === 'ACKNOWLEDGED').length}
             </span>
           </div>
           <Clock className="w-6 h-6 text-amber-400" />
@@ -263,7 +279,7 @@ export function AlertsManager() {
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase block">Resolved</span>
             <span className="text-2xl font-extrabold text-emerald-400">
-              {alerts.filter((a) => a.status === "RESOLVED").length}
+              {alerts.filter((a) => a.status === 'RESOLVED').length}
             </span>
           </div>
           <CheckCircle2 className="w-6 h-6 text-emerald-400" />
@@ -288,15 +304,15 @@ export function AlertsManager() {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-slate-400 uppercase font-bold">Severity:</span>
-            {["ALL", "CRITICAL", "WARNING", "INFO"].map((sev) => (
+            {['ALL', 'CRITICAL', 'WARNING', 'INFO'].map((sev) => (
               <button
                 key={sev}
                 type="button"
                 onClick={() => setSeverityFilter(sev)}
                 className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
                   severityFilter === sev
-                    ? "bg-cyan-950 text-cyan-200 border border-cyan-500/50"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+                    ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/50'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                 }`}
               >
                 {sev}
@@ -306,15 +322,15 @@ export function AlertsManager() {
 
           <div className="flex items-center gap-1.5 ml-3">
             <span className="text-[10px] text-slate-400 uppercase font-bold">Status:</span>
-            {["ALL", "ACTIVE", "ACKNOWLEDGED", "RESOLVED"].map((st) => (
+            {['ALL', 'ACTIVE', 'ACKNOWLEDGED', 'RESOLVED'].map((st) => (
               <button
                 key={st}
                 type="button"
                 onClick={() => setStatusFilter(st)}
                 className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
                   statusFilter === st
-                    ? "bg-cyan-950 text-cyan-200 border border-cyan-500/50"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+                    ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/50'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                 }`}
               >
                 {st}
@@ -330,7 +346,8 @@ export function AlertsManager() {
           <div className="flex items-center gap-2 text-cyan-200">
             <Cpu className="w-4 h-4 text-cyan-400" />
             <span>
-              FILTERED BY ASSET: <strong>{assetNameMap.get(assetFilter) || `Asset ${assetFilter.slice(0, 8)}`}</strong>
+              FILTERED BY ASSET:{' '}
+              <strong>{assetNameMap.get(assetFilter) || `Asset ${assetFilter.slice(0, 8)}`}</strong>
             </span>
           </div>
           <button
@@ -358,19 +375,19 @@ export function AlertsManager() {
         ) : (
           <div className="space-y-3">
             {filteredAlerts.map((alert) => {
-              const isCritical = alert.severity === "CRITICAL" || alert.severity === "EMERGENCY";
-              const isWarning = alert.severity === "WARNING";
-              const isActive = alert.status === "ACTIVE";
+              const isCritical = alert.severity === 'CRITICAL' || alert.severity === 'EMERGENCY';
+              const isWarning = alert.severity === 'WARNING';
+              const isActive = alert.status === 'ACTIVE';
 
               return (
                 <div
                   key={alert.id}
                   className={`p-4 rounded-xl border transition-all ${
                     isCritical
-                      ? "bg-rose-950/20 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
+                      ? 'bg-rose-950/20 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.15)]'
                       : isWarning
-                      ? "bg-amber-950/20 border-amber-500/40"
-                      : "bg-[#040810] border-white/[0.06]"
+                        ? 'bg-amber-950/20 border-amber-500/40'
+                        : 'bg-[#040810] border-white/[0.06]'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -380,10 +397,10 @@ export function AlertsManager() {
                         <span
                           className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${
                             isCritical
-                              ? "bg-rose-950 text-rose-300 border border-rose-500/50"
+                              ? 'bg-rose-950 text-rose-300 border border-rose-500/50'
                               : isWarning
-                              ? "bg-amber-950 text-amber-300 border border-amber-500/50"
-                              : "bg-cyan-950 text-cyan-300 border border-cyan-500/50"
+                                ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
+                                : 'bg-cyan-950 text-cyan-300 border border-cyan-500/50'
                           }`}
                         >
                           {alert.severity}
@@ -392,11 +409,11 @@ export function AlertsManager() {
                         {/* Status Badge */}
                         <span
                           className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                            alert.status === "ACTIVE"
-                              ? "bg-rose-500/20 text-rose-300"
-                              : alert.status === "ACKNOWLEDGED"
-                              ? "bg-amber-500/20 text-amber-300"
-                              : "bg-emerald-500/20 text-emerald-300"
+                            alert.status === 'ACTIVE'
+                              ? 'bg-rose-500/20 text-rose-300'
+                              : alert.status === 'ACKNOWLEDGED'
+                                ? 'bg-amber-500/20 text-amber-300'
+                                : 'bg-emerald-500/20 text-emerald-300'
                           }`}
                         >
                           {alert.status}
@@ -406,7 +423,8 @@ export function AlertsManager() {
                         {alert.assetId && (
                           <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[#040810] text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
                             <Cpu className="w-2.5 h-2.5 text-cyan-400" />
-                            {assetNameMap.get(alert.assetId) || `Equipment ${alert.assetId.slice(0, 8)}`}
+                            {assetNameMap.get(alert.assetId) ||
+                              `Equipment ${alert.assetId.slice(0, 8)}`}
                           </span>
                         )}
 
@@ -421,9 +439,9 @@ export function AlertsManager() {
 
                     {/* Actions */}
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      {alert.status !== "RESOLVED" && (
+                      {alert.status !== 'RESOLVED' && (
                         <Link
-                          href={`/maintenance?action=create&stationId=${selectedStation}&assetId=${alert.assetId || ""}&title=${encodeURIComponent(`Investigate: ${alert.title}`)}&priority=${alert.severity === "CRITICAL" ? "HIGH" : "MEDIUM"}`}
+                          href={`/maintenance?action=create&stationId=${selectedStation}&assetId=${alert.assetId || ''}&title=${encodeURIComponent(`Investigate: ${alert.title}`)}&priority=${alert.severity === 'CRITICAL' ? 'HIGH' : 'MEDIUM'}`}
                           className="px-2.5 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
                         >
                           <Wrench className="w-3 h-3 text-cyan-400" />
@@ -448,7 +466,7 @@ export function AlertsManager() {
                         </button>
                       )}
 
-                      {alert.status !== "RESOLVED" && (
+                      {alert.status !== 'RESOLVED' && (
                         <button
                           type="button"
                           onClick={() => handleResolve(alert.id)}

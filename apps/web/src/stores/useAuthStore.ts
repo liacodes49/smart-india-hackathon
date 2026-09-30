@@ -14,7 +14,7 @@ export interface AuthUser {
 
 export const PRESET_ACCOUNTS: Record<TerminalRole, AuthUser> = {
   MAITRI: {
-    id: 'user-maitri-commander',
+    id: '00000001-0000-0000-0000-000000000002',
     email: 'commander.maitri@antarctic.gov.in',
     name: 'Col. Amitav Banerjee',
     role: 'STATION_COMMANDER',
@@ -22,7 +22,7 @@ export const PRESET_ACCOUNTS: Record<TerminalRole, AuthUser> = {
     stationId: 'MAITRI',
   },
   BHARATI: {
-    id: 'user-bharati-commander',
+    id: '00000001-0000-0000-0000-000000000003',
     email: 'commander.bharati@antarctic.gov.in',
     name: 'Cmdr. Sunita Rao',
     role: 'STATION_COMMANDER',
@@ -30,7 +30,7 @@ export const PRESET_ACCOUNTS: Record<TerminalRole, AuthUser> = {
     stationId: 'BHARATI',
   },
   HQ: {
-    id: 'user-hq-director',
+    id: '00000001-0000-0000-0000-000000000001',
     email: 'admin@antarctic.gov.in',
     name: 'Dr. Rajeshwar Sharma',
     role: 'MISSION_DIRECTOR',

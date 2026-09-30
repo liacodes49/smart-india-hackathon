@@ -24,9 +24,30 @@ export interface FindAlertsFilter {
 }
 
 export class AlertsRepository {
+  private isUuid(val?: string | null): boolean {
+    return (
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+    );
+  }
+
   private async resolveValidUserId(userId?: string): Promise<string | null> {
-    if (userId) {
-      const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+    if (userId && this.isUuid(userId)) {
+      const existingUser = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      if (existingUser.length > 0) {
+        return existingUser[0].id;
+      }
+    }
+    if (userId && !this.isUuid(userId) && userId.includes('@')) {
+      const existingUser = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, userId))
+        .limit(1);
       if (existingUser.length > 0) {
         return existingUser[0].id;
       }
@@ -38,13 +59,13 @@ export class AlertsRepository {
   async findAll(filters?: FindAlertsFilter): Promise<{ data: AlertSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId) {
+    if (filters?.stationId && this.isUuid(filters.stationId)) {
       conditions.push(eq(alerts.stationId, filters.stationId));
     }
-    if (filters?.sensorId) {
+    if (filters?.sensorId && this.isUuid(filters.sensorId)) {
       conditions.push(eq(alerts.sensorId, filters.sensorId));
     }
-    if (filters?.assetId) {
+    if (filters?.assetId && this.isUuid(filters.assetId)) {
       conditions.push(eq(alerts.assetId, filters.assetId));
     }
     if (filters?.severity) {
@@ -84,11 +105,13 @@ export class AlertsRepository {
   }
 
   async findById(id: string): Promise<AlertSelect | null> {
+    if (!this.isUuid(id)) return null;
     const rows = await db.select().from(alerts).where(eq(alerts.id, id)).limit(1);
     return rows[0] ?? null;
   }
 
   async findActiveBySensor(sensorId: string): Promise<AlertSelect | null> {
+    if (!this.isUuid(sensorId)) return null;
     const rows = await db
       .select()
       .from(alerts)
@@ -104,6 +127,7 @@ export class AlertsRepository {
   }
 
   async update(id: string, data: Partial<AlertInsert>): Promise<AlertSelect | null> {
+    if (!this.isUuid(id)) return null;
     const [updated] = await db
       .update(alerts)
       .set({
@@ -122,7 +146,7 @@ export class AlertsRepository {
     const validUserId = await this.resolveValidUserId(userId);
 
     const metadata = {
-      ...(existing.metadata as Record<string, unknown> ?? {}),
+      ...((existing.metadata as Record<string, unknown>) ?? {}),
       acknowledgementNotes: notes,
     };
 
@@ -147,7 +171,7 @@ export class AlertsRepository {
     const validUserId = await this.resolveValidUserId(userId);
 
     const metadata = {
-      ...(existing.metadata as Record<string, unknown> ?? {}),
+      ...((existing.metadata as Record<string, unknown>) ?? {}),
       resolutionNotes: notes,
     };
 
