@@ -39,6 +39,14 @@ export interface EnergyDataPoint {
   renewableKw: number;
 }
 
+export interface CorrelatedAlert {
+  id: string;
+  title: string;
+  severity: 'WARNING' | 'CRITICAL' | 'INFO';
+  timestamp: string;
+  message: string;
+}
+
 export interface EnergyAnalytics {
   currentDemandKw: number;
   currentGenerationKw: number;
@@ -48,6 +56,7 @@ export interface EnergyAnalytics {
   reserveHeadroomKw: number;
   trendPercentage: number;
   history: Record<TimeframeOption, EnergyDataPoint[]>;
+  activeAlerts?: CorrelatedAlert[];
 }
 
 // 3. Generator Performance

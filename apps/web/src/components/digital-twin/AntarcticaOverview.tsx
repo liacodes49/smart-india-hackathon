@@ -22,6 +22,8 @@ import {
     STATIONS,
     type StationCoordinates,
 } from "@/features/digital-twin/utils/stations";
+import { apiClient } from "@/lib/api";
+import { useStationStore } from "@/stores/useStationStore";
 
 import {
     StationMarker,
@@ -49,10 +51,11 @@ import {
 
 import {
     INITIAL_TELEMETRY,
-    simulateTelemetry,
     type AssetHealth,
     type TelemetryAsset,
 } from "@/features/digital-twin/utils/StationTelemetry";
+
+import { useLiveTelemetry } from "@/lib/hooks/useLiveTelemetry";
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
@@ -1064,6 +1067,7 @@ interface SceneProps {
     telemetry: TelemetryAsset[];
     viewMode: StationViewMode;
     timeOfDay: number;
+    environment?: any;
     onSelectStation: (
         station: StationCoordinates,
     ) => void;
@@ -1081,6 +1085,7 @@ function Scene({
     telemetry,
     viewMode,
     timeOfDay,
+    environment,
     onSelectStation,
     onSelectAsset,
 }: SceneProps) {
@@ -1089,6 +1094,9 @@ function Scene({
             <OverviewEnvironment
                 timeOfDay={
                     timeOfDay
+                }
+                environment={
+                    environment
                 }
             />
 
@@ -1177,7 +1185,21 @@ function Scene({
 /* Main component                                                             */
 /* -------------------------------------------------------------------------- */
 
-export default function AntarcticaOverview() {
+interface AntarcticaOverviewProps {
+    embedded?: boolean;
+    initialStationId?: string;
+}
+
+export default function AntarcticaOverview({
+    embedded = false,
+    initialStationId,
+}: AntarcticaOverviewProps = {}) {
+    const storeActiveStation = useStationStore((s) => s.activeStation);
+    const storeSelectedAssetId = useStationStore((s) => s.selectedAssetId);
+    const setStoreSelectedAsset = useStationStore((s) => s.setSelectedAsset);
+    const storeViewMode = useStationStore((s) => s.viewMode);
+    const storeCameraPreset = useStationStore((s) => s.cameraPreset);
+
     const [
         terrainData,
         setTerrainData,
@@ -1192,29 +1214,30 @@ export default function AntarcticaOverview() {
     ] =
         useState<
             StationCoordinates | null
-        >(null);
+        >(() => {
+            const targetId = initialStationId || (embedded ? storeActiveStation : null);
+            if (targetId) {
+                return STATIONS.find((s) => s.id === targetId) ?? null;
+            }
+            return null;
+        });
 
     const [
         selectedAssetId,
         setSelectedAssetId,
     ] =
-        useState<string | null>(
-            null,
-        );
+        useState<string | null>(null);
 
-    const [
-        telemetry,
-        setTelemetry,
-    ] = useState<TelemetryAsset[]>(
-        INITIAL_TELEMETRY,
-    );
+    const effectiveSelectedAssetId = embedded ? storeSelectedAssetId : selectedAssetId;
+
+    const { telemetry, environment, edgeStatus, loading: telemetryLoading, error: telemetryError } = useLiveTelemetry(selectedStation?.id || "MAITRI");
 
     const [
         viewMode,
         setViewMode,
     ] =
         useState<StationViewMode>(
-            "NORMAL",
+            (embedded && storeViewMode as StationViewMode) || "NORMAL",
         );
 
     const [
@@ -1222,13 +1245,40 @@ export default function AntarcticaOverview() {
         setCameraPreset,
     ] =
         useState<CameraPreset>(
-            "OVERVIEW",
+            (embedded && storeCameraPreset as CameraPreset) || "OVERVIEW",
         );
 
     const [
         autoFocusEnabled,
         setAutoFocusEnabled,
-    ] = useState(true);
+    ] = useState(!embedded);
+
+    // Sync embedded state with useStationStore
+    useEffect(() => {
+        if (embedded && storeActiveStation) {
+            const found = STATIONS.find((s) => s.id === storeActiveStation);
+            if (found) setSelectedStation(found);
+        }
+    }, [embedded, storeActiveStation]);
+
+    useEffect(() => {
+        if (embedded && storeCameraPreset) {
+            setCameraPreset(storeCameraPreset as CameraPreset);
+        }
+    }, [embedded, storeCameraPreset]);
+
+    useEffect(() => {
+        if (embedded && storeViewMode) {
+            setViewMode(storeViewMode as StationViewMode);
+        }
+    }, [embedded, storeViewMode]);
+
+    const handleSelectAsset = (assetId: string | null) => {
+        setSelectedAssetId(assetId);
+        if (embedded) {
+            setStoreSelectedAsset(assetId);
+        }
+    };
 
     const [
         timeOfDay,
@@ -1260,26 +1310,7 @@ export default function AntarcticaOverview() {
         };
     }, []);
 
-    useEffect(() => {
-        if (!selectedStation) {
-            return;
-        }
 
-        const interval =
-            window.setInterval(() => {
-                setTelemetry(
-                    (previous) =>
-                        simulateTelemetry(
-                            previous,
-                        ),
-                );
-            }, 1500);
-
-        return () =>
-            window.clearInterval(
-                interval,
-            );
-    }, [selectedStation]);
 
     const selectedAsset =
         telemetry.find(
@@ -1465,7 +1496,7 @@ export default function AntarcticaOverview() {
     }
 
     return (
-        <div className="relative h-screen min-h-[700px] w-full overflow-hidden">
+        <div className={`relative w-full overflow-hidden ${embedded ? 'h-full min-h-[460px]' : 'h-screen min-h-[700px]'}`}>
             <Canvas
                 shadows
                 className="block h-full w-full"
@@ -1492,7 +1523,7 @@ export default function AntarcticaOverview() {
                         cameraTarget
                     }
                     selectedAssetId={
-                        selectedAssetId
+                        effectiveSelectedAssetId
                     }
                     stationStatus={
                         stationStatus
@@ -1506,16 +1537,19 @@ export default function AntarcticaOverview() {
                     timeOfDay={
                         timeOfDay
                     }
+                    environment={
+                        environment
+                    }
                     onSelectStation={
                         handleSelectStation
                     }
                     onSelectAsset={
-                        setSelectedAssetId
+                        handleSelectAsset
                     }
                 />
             </Canvas>
 
-            {selectedStation && (
+            {!embedded && selectedStation && (
                 <>
                     <ModeSelector
                         mode={
@@ -1583,9 +1617,15 @@ export default function AntarcticaOverview() {
                                     }
                                 </span>
 
-                                <span className="ml-auto font-mono text-[9px] text-slate-600">
-                                    LIVE
-                                </span>
+                                <button
+                                    onClick={async () => {
+                                        const nextState = edgeStatus === 'ONLINE' ? 'DEGRADED' : edgeStatus === 'DEGRADED' ? 'BLACKOUT' : 'ONLINE';
+                                        await apiClient.edge.setConnectivity(selectedStation.id, { state: nextState, reason: 'Manual override for demo' });
+                                    }}
+                                    className={`ml-auto rounded px-1.5 py-0.5 hover:bg-white/10 transition font-mono text-[9px] font-bold tracking-widest ${edgeStatus === 'ONLINE' ? 'text-green-500' : edgeStatus === 'DEGRADED' ? 'text-yellow-500' : 'text-red-500'}`}
+                                >
+                                    {edgeStatus === 'ONLINE' ? '🟢 SATCOM LINK' : edgeStatus === 'DEGRADED' ? '🟡 EDGE CACHE' : '🔴 BLACKOUT'}
+                                </button>
                             </div>
 
                             <div className="mt-3 border-t border-white/8 pt-3">
@@ -1726,7 +1766,7 @@ export default function AntarcticaOverview() {
                 </>
             )}
 
-            {!selectedStation && (
+            {!embedded && !selectedStation && (
                 <div className="pointer-events-none absolute left-6 top-6 z-10">
                     <div className="rounded-2xl border border-white/10 bg-slate-950/60 px-5 py-4 shadow-2xl backdrop-blur-md">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-sky-300">

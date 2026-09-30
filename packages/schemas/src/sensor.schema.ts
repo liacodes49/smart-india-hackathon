@@ -34,8 +34,9 @@ export const updateSensorSchema = createSensorSchema.partial();
 export type UpdateSensorInput = z.infer<typeof updateSensorSchema>;
 
 export const sensorQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
   assetId: z.string().uuid().optional(),
+
   type: z.enum([
     'TEMPERATURE',
     'HUMIDITY',

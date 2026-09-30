@@ -21,10 +21,39 @@ import {
   inventoryItems,
   resourceConsumption,
   weatherObservations,
+  predictions,
+  simulations,
+  maintenanceRecords,
+  auditLogs,
+  incidents,
+  edgeSyncBatches,
+  edgeOutbox,
+  reports,
 } from '../schema/index.js';
 
 async function seed() {
   logger.info('🌱 Starting rich Antarctic Digital Twin database seed...');
+  
+  logger.info('  → Clearing existing data...');
+  await db.delete(reports);
+  await db.delete(edgeOutbox);
+  await db.delete(edgeSyncBatches);
+  await db.delete(incidents);
+  await db.delete(weatherObservations);
+  await db.delete(resourceConsumption);
+  await db.delete(inventoryItems);
+  await db.delete(telemetry);
+  await db.delete(alerts);
+  await db.delete(predictions);
+  await db.delete(simulations);
+  await db.delete(maintenanceRecords);
+  await db.delete(auditLogs);
+  await db.delete(sensors);
+  await db.delete(assets);
+  await db.delete(rooms);
+  await db.delete(buildings);
+  await db.delete(users);
+  await db.delete(stations);
 
   // 1. Seed Stations
   logger.info('  → Seeding Stations (Maitri & Bharati)...');
@@ -230,7 +259,7 @@ async function seed() {
 
   // 4. Seed Assets & Equipment
   logger.info('  → Seeding Critical Assets...');
-  const [gen1] = await db
+  const [gen1, pump1, chp1, radome1] = await db
     .insert(assets)
     .values([
       {
@@ -286,99 +315,75 @@ async function seed() {
 
   // 5. Seed Sensors
   logger.info('  → Seeding Sensors & Thresholds...');
-  const [s1, , s3, s4] = await db
+  const insertedSensors = await db
     .insert(sensors)
     .values([
-      {
-        assetId: gen1.id,
-        stationId: maitriStation.id,
-        name: 'Generator 1 Coolant Temperature',
-        type: 'TEMPERATURE',
-        unit: '°C',
-        minThreshold: 40,
-        maxThreshold: 98,
-        warningThreshold: 92,
-        criticalThreshold: 98,
-        status: 'NORMAL',
-        lastReading: 82.4,
-      },
-      {
-        assetId: gen1.id,
-        stationId: maitriStation.id,
-        name: 'Generator 1 Active Power Output',
-        type: 'POWER',
-        unit: '%',
-        minThreshold: 10,
-        maxThreshold: 100,
-        warningThreshold: 30,
-        criticalThreshold: 15,
-        status: 'NORMAL',
-        lastReading: 68.5,
-      },
-      {
-        assetId: gen1.id,
-        stationId: maitriStation.id,
-        name: 'Main Diesel Day-Tank Fuel Level',
-        type: 'FUEL',
-        unit: '%',
-        minThreshold: 0,
-        maxThreshold: 100,
-        warningThreshold: 25,
-        criticalThreshold: 10,
-        status: 'NORMAL',
-        lastReading: 84.0,
-      },
-      {
-        assetId: gen1.id,
-        stationId: bharatiStation.id,
-        name: 'Bharati Outside Ambient Air Temperature',
-        type: 'TEMPERATURE',
-        unit: '°C',
-        minThreshold: -70,
-        maxThreshold: 15,
-        warningThreshold: -60,
-        criticalThreshold: -70,
-        status: 'NORMAL',
-        lastReading: -24.8,
-      },
+      // MAITRI SENSORS
+      { assetId: gen1.id, stationId: maitriStation.id, name: 'Gen-1 Coolant Temperature', type: 'TEMPERATURE', unit: '°C', minThreshold: 40, maxThreshold: 98, warningThreshold: 92, criticalThreshold: 98, status: 'NORMAL', lastReading: 82.4 },
+      { assetId: gen1.id, stationId: maitriStation.id, name: 'Gen-1 Power Output', type: 'POWER', unit: '%', minThreshold: 10, maxThreshold: 100, warningThreshold: 30, criticalThreshold: 15, status: 'NORMAL', lastReading: 68.5 },
+      { assetId: gen1.id, stationId: maitriStation.id, name: 'Gen-1 Fuel Level (Day Tank)', type: 'FUEL', unit: '%', minThreshold: 0, maxThreshold: 100, warningThreshold: 25, criticalThreshold: 10, status: 'NORMAL', lastReading: 84.0 },
+      { assetId: gen1.id, stationId: maitriStation.id, name: 'Gen-2 Coolant Temperature', type: 'TEMPERATURE', unit: '°C', minThreshold: 40, maxThreshold: 98, warningThreshold: 92, criticalThreshold: 98, status: 'NORMAL', lastReading: 80.1 },
+      { assetId: gen1.id, stationId: maitriStation.id, name: 'Gen-2 Power Output', type: 'POWER', unit: '%', minThreshold: 10, maxThreshold: 100, warningThreshold: 30, criticalThreshold: 15, status: 'NORMAL', lastReading: 0.0 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Lake Priyadarshini Intake Flow', type: 'WATER', unit: 'L/min', minThreshold: 0, maxThreshold: 50, warningThreshold: 10, criticalThreshold: 5, status: 'NORMAL', lastReading: 22.5 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Water Storage Level', type: 'WATER', unit: '%', minThreshold: 0, maxThreshold: 100, warningThreshold: 30, criticalThreshold: 15, status: 'NORMAL', lastReading: 78.0 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Outside Ambient Temperature', type: 'TEMPERATURE', unit: '°C', minThreshold: -70, maxThreshold: 15, warningThreshold: -60, criticalThreshold: -65, status: 'NORMAL', lastReading: -25.4 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Wind Speed', type: 'WIND_SPEED', unit: 'km/h', minThreshold: 0, maxThreshold: 250, warningThreshold: 100, criticalThreshold: 150, status: 'NORMAL', lastReading: 45.2 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Atmospheric Pressure', type: 'PRESSURE', unit: 'hPa', minThreshold: 950, maxThreshold: 1050, warningThreshold: 970, criticalThreshold: 960, status: 'NORMAL', lastReading: 985.4 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Station Interior Temperature', type: 'TEMPERATURE', unit: '°C', minThreshold: 10, maxThreshold: 30, warningThreshold: 15, criticalThreshold: 12, status: 'NORMAL', lastReading: 21.5 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Station CO2 Level', type: 'CO2', unit: 'ppm', minThreshold: 300, maxThreshold: 2000, warningThreshold: 800, criticalThreshold: 1200, status: 'NORMAL', lastReading: 420.0 },
+      { assetId: gen1.id, stationId: maitriStation.id, name: 'UPS Battery Charge', type: 'BATTERY', unit: '%', minThreshold: 0, maxThreshold: 100, warningThreshold: 40, criticalThreshold: 20, status: 'NORMAL', lastReading: 100.0 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Geomagnetic Field Intensity', type: 'STRUCTURAL', unit: 'nT', minThreshold: 20000, maxThreshold: 80000, warningThreshold: 25000, criticalThreshold: 20000, status: 'NORMAL', lastReading: 45000 },
+      { assetId: pump1.id, stationId: maitriStation.id, name: 'Seismograph Ground Velocity', type: 'VIBRATION', unit: 'nm/s', minThreshold: 0, maxThreshold: 100, warningThreshold: 50, criticalThreshold: 80, status: 'NORMAL', lastReading: 12.4 },
+
+      // BHARATI SENSORS
+      { assetId: chp1.id, stationId: bharatiStation.id, name: 'CHP Unit-1 Electrical Output', type: 'POWER', unit: 'kW', minThreshold: 0, maxThreshold: 300, warningThreshold: 260, criticalThreshold: 280, status: 'NORMAL', lastReading: 185.0 },
+      { assetId: chp1.id, stationId: bharatiStation.id, name: 'CHP Unit-1 Thermal Output', type: 'TEMPERATURE', unit: '°C', minThreshold: 50, maxThreshold: 130, warningThreshold: 110, criticalThreshold: 125, status: 'NORMAL', lastReading: 95.0 },
+      { assetId: chp1.id, stationId: bharatiStation.id, name: 'Jet A-1 Fuel Tank Level', type: 'FUEL', unit: '%', minThreshold: 0, maxThreshold: 100, warningThreshold: 25, criticalThreshold: 10, status: 'NORMAL', lastReading: 72.0 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'ISRO Radome Signal Strength', type: 'NETWORK', unit: 'dBm', minThreshold: -120, maxThreshold: 0, warningThreshold: -90, criticalThreshold: -100, status: 'NORMAL', lastReading: -55.0 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'Bharati Outside Ambient Air Temp', type: 'TEMPERATURE', unit: '°C', minThreshold: -70, maxThreshold: 15, warningThreshold: -60, criticalThreshold: -70, status: 'NORMAL', lastReading: -24.8 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'Katabatic Wind Speed', type: 'WIND_SPEED', unit: 'km/h', minThreshold: 0, maxThreshold: 300, warningThreshold: 120, criticalThreshold: 180, status: 'NORMAL', lastReading: 55.0 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'RO Water Production Rate', type: 'WATER', unit: 'L/hr', minThreshold: 0, maxThreshold: 600, warningThreshold: 100, criticalThreshold: 50, status: 'NORMAL', lastReading: 350.0 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'Habitat Interior Humidity', type: 'HUMIDITY', unit: '%', minThreshold: 0, maxThreshold: 100, warningThreshold: 25, criticalThreshold: 15, status: 'NORMAL', lastReading: 45.0 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'Solar Irradiance', type: 'SOLAR_RADIATION', unit: 'W/m²', minThreshold: 0, maxThreshold: 1200, warningThreshold: 0, criticalThreshold: 0, status: 'NORMAL', lastReading: 120.0 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'Edge Cluster CPU Load', type: 'NETWORK', unit: '%', minThreshold: 0, maxThreshold: 100, warningThreshold: 85, criticalThreshold: 95, status: 'NORMAL', lastReading: 42.0 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'Edge Cluster Storage Used', type: 'NETWORK', unit: '%', minThreshold: 0, maxThreshold: 100, warningThreshold: 80, criticalThreshold: 90, status: 'NORMAL', lastReading: 65.0 },
+      { assetId: radome1.id, stationId: bharatiStation.id, name: 'Seismic Accelerometer (E-W)', type: 'VIBRATION', unit: 'µm/s', minThreshold: 0, maxThreshold: 50, warningThreshold: 20, criticalThreshold: 35, status: 'NORMAL', lastReading: 5.2 },
     ])
     .returning();
 
   // 6. Seed Sample Telemetry Readings
   logger.info('  → Seeding Baseline Telemetry...');
   const now = Date.now();
-  const telemetryData = [];
+  const telemetryData: any[] = [];
   for (let i = 0; i < 24; i++) {
+
     const time = new Date(now - (23 - i) * 3600 * 1000);
-    // Coolant temp variation
-    telemetryData.push({
-      sensorId: s1.id,
-      stationId: maitriStation.id,
-      timestamp: time,
-      value: +(80 + Math.sin(i / 3) * 4 + (Math.random() - 0.5) * 1.5).toFixed(1),
-      unit: '°C',
-      status: 'NORMAL' as const,
-      quality: 100,
-    });
-    // Ambient temperature
-    telemetryData.push({
-      sensorId: s4.id,
-      stationId: bharatiStation.id,
-      timestamp: time,
-      value: +(-25 + Math.sin(i / 4) * 5 + (Math.random() - 0.5) * 2).toFixed(1),
-      unit: '°C',
-      status: 'NORMAL' as const,
-      quality: 100,
+    
+    insertedSensors.forEach((s) => {
+      // Create a slightly jittery baseline value
+      const val = s.lastReading != null ? (s.lastReading as number) : 50;
+      telemetryData.push({
+        sensorId: s.id,
+        stationId: s.stationId,
+        timestamp: time,
+        value: +(val + (Math.random() - 0.5) * 2).toFixed(2),
+        unit: s.unit,
+        status: 'NORMAL' as const,
+        quality: 100,
+      });
     });
   }
   await db.insert(telemetry).values(telemetryData);
 
   // 7. Seed Sample Alerts
   logger.info('  → Seeding Initial Alerts...');
+  const mFuelSensor = insertedSensors.find(s => s.name.includes('Fuel Level'));
+  const bWindSensor = insertedSensors.find(s => s.name.includes('Katabatic Wind Speed'));
+  
   await db.insert(alerts).values([
     {
       stationId: maitriStation.id,
-      sensorId: s3.id,
+      sensorId: mFuelSensor?.id,
       title: 'Scheduled Antarctic Fuel Replenishment Window',
       message: 'Maitri bulk tank transfer scheduled from northern fuel bladders. Ensure heated tracing is engaged.',
       severity: 'INFO',
@@ -387,7 +392,7 @@ async function seed() {
     },
     {
       stationId: bharatiStation.id,
-      sensorId: s4.id,
+      sensorId: bWindSensor?.id,
       title: 'Approaching Katabatic Wind Front',
       message: 'Meteorological sensors register pressure drop of 4.2 hPa/hr. External doors locked down.',
       severity: 'WARNING',

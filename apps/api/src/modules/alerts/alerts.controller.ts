@@ -70,13 +70,8 @@ export const alertsController = {
   acknowledge: async (req: Request, res: Response) => {
     try {
       const id = getParam(req.params.id);
-      const userId = req.user?.id ?? req.body.acknowledgedBy;
-      const notes = req.body.notes;
-
-      if (!userId) {
-        res.status(401).json(formatError('UNAUTHORIZED', 'User ID required for acknowledgement'));
-        return;
-      }
+      const userId = req.user?.id ?? req.body?.acknowledgedBy ?? '00000000-0000-0000-0000-000000000000';
+      const notes = req.body?.notes ?? req.body?.operatorNotes;
 
       const updated = await alertsService.acknowledgeAlert(id, {
         acknowledgedBy: userId,
@@ -99,8 +94,8 @@ export const alertsController = {
   resolve: async (req: Request, res: Response) => {
     try {
       const id = getParam(req.params.id);
-      const userId = req.user?.id;
-      const notes = req.body.notes;
+      const userId = req.user?.id ?? req.body?.resolvedBy ?? '00000000-0000-0000-0000-000000000000';
+      const notes = req.body?.notes ?? req.body?.resolutionNotes ?? req.body?.operatorNotes;
 
       const updated = await alertsService.resolveAlert(id, userId, notes);
       if (!updated) {

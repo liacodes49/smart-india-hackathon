@@ -59,8 +59,8 @@ export const simulationController = {
 
   create: async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.userId ?? (req as any).user?.id ?? '00000000-0000-0000-0000-000000000001';
-      const sim = await simulationService.createSimulation(req.body, userId);
+      const userId = (req as any).user?.userId ?? (req as any).user?.id;
+      const sim = await simulationService.createSimulation(req.body, userId ?? null);
       res.status(201).json({
         success: true,
         data: sim,

@@ -3,11 +3,7 @@
 import React, { useState } from "react";
 import { useStationStore } from "@/stores/useStationStore";
 import { StationId } from "@repo/shared/enums";
-import {
-  MAITRI_ANALYTICS,
-  BHARATI_ANALYTICS,
-  MAITRI_VS_BHARATI_COMPARISON,
-} from "@/features/analytics/mockData";
+import { useAnalyticsData } from "@/lib/hooks/useAnalyticsData";
 import { StationViewMode } from "@/features/analytics/types";
 import { AnalyticsKpiOverview } from "./AnalyticsKpiOverview";
 import { EnergyAnalyticsPanel } from "./EnergyAnalyticsPanel";
@@ -23,6 +19,8 @@ import { Station3DAnalyticsView } from "./Station3DAnalyticsView";
 import {
   BarChart3,
   Scale,
+  RefreshCw,
+  Radio,
 } from "lucide-react";
 
 export function AnalyticsPage() {
@@ -43,9 +41,18 @@ export function AnalyticsPage() {
     }
   };
 
-  // Primary dataset depending on selected station
-  const currentDataset =
-    stationViewMode === "BHARATI" ? BHARATI_ANALYTICS : MAITRI_ANALYTICS;
+  // Live backend-connected analytics hook
+  const {
+    currentDataset,
+    maitriDataset,
+    bharatiDataset,
+    comparison,
+    loading,
+    isLive,
+    lastUpdated,
+    refetch,
+  } = useAnalyticsData(stationViewMode);
+
 
   return (
     <div className="flex-1 flex flex-col gap-5 h-full min-h-0 select-none font-mono pb-12">
@@ -67,74 +74,102 @@ export function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Station Mode Segmented Selector: MAITRI | BHARATI | BOTH */}
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-400 font-bold uppercase hidden sm:inline">
-            Station Filter:
-          </span>
-          <div
-            className="flex items-center p-1 rounded-xl bg-[#040810] border border-white/[0.08]"
-            role="tablist"
-            aria-label="Analytics Station Selector"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={stationViewMode === "MAITRI"}
-              onClick={() => handleSelectStationMode("MAITRI")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                stationViewMode === "MAITRI"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  stationViewMode === "MAITRI" ? "bg-cyan-400" : "bg-slate-600"
-                }`}
-              />
-              <span>MAITRI</span>
-              <span className="text-[9px] text-slate-400 hidden lg:inline">
-                (70°S)
+        {/* Right Header Status & Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Live Sync Status */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#040810] border border-white/[0.08] text-[11px]">
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLive ? 'bg-emerald-400' : 'bg-cyan-400'}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isLive ? 'bg-emerald-500' : 'bg-cyan-500'}`} />
+            </span>
+            <span className="font-bold text-slate-300">
+              {isLive ? 'LIVE TWIN SYNC' : 'CONNECTING...'}
+            </span>
+            {lastUpdated && (
+              <span className="text-[10px] text-slate-500 hidden sm:inline" suppressHydrationWarning>
+                {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </span>
-            </button>
-
+            )}
             <button
               type="button"
-              role="tab"
-              aria-selected={stationViewMode === "BHARATI"}
-              onClick={() => handleSelectStationMode("BHARATI")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                stationViewMode === "BHARATI"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
-              }`}
+              onClick={() => refetch()}
+              disabled={loading}
+              title="Refresh Analytics Data"
+              className="p-1 rounded text-slate-400 hover:text-cyan-400 transition-colors ml-1 cursor-pointer disabled:opacity-50"
             >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  stationViewMode === "BHARATI" ? "bg-cyan-400" : "bg-slate-600"
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+            </button>
+          </div>
+
+          {/* Station Mode Segmented Selector: MAITRI | BHARATI | BOTH */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-400 font-bold uppercase hidden sm:inline">
+              Station Filter:
+            </span>
+            <div
+              className="flex items-center p-1 rounded-xl bg-[#040810] border border-white/[0.08]"
+              role="tablist"
+              aria-label="Analytics Station Selector"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={stationViewMode === "MAITRI"}
+                onClick={() => handleSelectStationMode("MAITRI")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  stationViewMode === "MAITRI"
+                    ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
                 }`}
-              />
-              <span>BHARATI</span>
-              <span className="text-[9px] text-slate-400 hidden lg:inline">
-                (69°S)
-              </span>
-            </button>
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    stationViewMode === "MAITRI" ? "bg-cyan-400" : "bg-slate-600"
+                  }`}
+                />
+                <span>MAITRI</span>
+                <span className="text-[9px] text-slate-400 hidden lg:inline">
+                  (70°S)
+                </span>
+              </button>
 
-            <button
-              type="button"
-              role="tab"
-              aria-selected={stationViewMode === "BOTH"}
-              onClick={() => handleSelectStationMode("BOTH")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                stationViewMode === "BOTH"
-                  ? "bg-gradient-to-r from-cyan-950 to-emerald-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_14px_rgba(6,182,212,0.3)]"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
-              }`}
-            >
-              <Scale className="w-3.5 h-3.5 text-cyan-400" />
-              <span>BOTH (COMPARE)</span>
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={stationViewMode === "BHARATI"}
+                onClick={() => handleSelectStationMode("BHARATI")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  stationViewMode === "BHARATI"
+                    ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    stationViewMode === "BHARATI" ? "bg-cyan-400" : "bg-slate-600"
+                  }`}
+                />
+                <span>BHARATI</span>
+                <span className="text-[9px] text-slate-400 hidden lg:inline">
+                  (69°S)
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={stationViewMode === "BOTH"}
+                onClick={() => handleSelectStationMode("BOTH")}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  stationViewMode === "BOTH"
+                    ? "bg-gradient-to-r from-cyan-950 to-emerald-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_14px_rgba(6,182,212,0.3)]"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+                }`}
+              >
+                <Scale className="w-3.5 h-3.5 text-cyan-400" />
+                <span>BOTH (COMPARE)</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -143,7 +178,7 @@ export function AnalyticsPage() {
       {stationViewMode === "BOTH" && (
         <div className="space-y-4">
           <StationComparisonPanel
-            comparison={MAITRI_VS_BHARATI_COMPARISON}
+            comparison={comparison}
             isExpandedOnly
           />
 
@@ -152,24 +187,24 @@ export function AnalyticsPage() {
             <div className="p-3.5 rounded-xl border border-cyan-500/30 bg-[#080d16]/80 flex flex-col justify-between">
               <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
                 <span className="text-xs font-bold text-cyan-300">
-                  [MAITRI] Quick Summary
+                  [MAITRI] Live Quick Summary
                 </span>
                 <span className="text-[10px] text-slate-400 font-semibold">
-                  Health: 88% | Risk: MODERATE
+                  Health: {maitriDataset.kpi.stationHealthScore}% | Risk: {maitriDataset.kpi.riskLevel}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-[10.5px]">
                 <div>
                   <span className="text-slate-400 text-[9.5px]">Demand:</span>
-                  <div className="font-bold text-cyan-400">184 kW</div>
+                  <div className="font-bold text-cyan-400">{maitriDataset.kpi.powerDemandKw} kW</div>
                 </div>
                 <div>
                   <span className="text-slate-400 text-[9.5px]">Fuel Reserve:</span>
-                  <div className="font-bold text-slate-200">128.4k L (74d)</div>
+                  <div className="font-bold text-slate-200">{(maitriDataset.kpi.fuelRemainingLitres / 1000).toFixed(1)}k L ({maitriDataset.kpi.fuelDaysRemaining}d)</div>
                 </div>
                 <div>
                   <span className="text-slate-400 text-[9.5px]">Temp:</span>
-                  <div className="font-bold text-sky-300">-34.8°C</div>
+                  <div className="font-bold text-sky-300">{maitriDataset.kpi.temperatureC}°C</div>
                 </div>
               </div>
             </div>
@@ -177,30 +212,31 @@ export function AnalyticsPage() {
             <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-[#080d16]/80 flex flex-col justify-between">
               <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
                 <span className="text-xs font-bold text-emerald-300">
-                  [BHARATI] Quick Summary
+                  [BHARATI] Live Quick Summary
                 </span>
                 <span className="text-[10px] text-slate-400 font-semibold">
-                  Health: 94% | Risk: LOW
+                  Health: {bharatiDataset.kpi.stationHealthScore}% | Risk: {bharatiDataset.kpi.riskLevel}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 mt-2 text-[10.5px]">
                 <div>
                   <span className="text-slate-400 text-[9.5px]">Demand:</span>
-                  <div className="font-bold text-emerald-400">215 kW</div>
+                  <div className="font-bold text-emerald-400">{bharatiDataset.kpi.powerDemandKw} kW</div>
                 </div>
                 <div>
                   <span className="text-slate-400 text-[9.5px]">Fuel Reserve:</span>
-                  <div className="font-bold text-slate-200">214.0k L (102d)</div>
+                  <div className="font-bold text-slate-200">{(bharatiDataset.kpi.fuelRemainingLitres / 1000).toFixed(1)}k L ({bharatiDataset.kpi.fuelDaysRemaining}d)</div>
                 </div>
                 <div>
                   <span className="text-slate-400 text-[9.5px]">Temp:</span>
-                  <div className="font-bold text-sky-300">-26.4°C</div>
+                  <div className="font-bold text-sky-300">{bharatiDataset.kpi.temperatureC}°C</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
 
       {/* ── 1. KPI OVERVIEW ─────────────────────────────────────────── */}
       <AnalyticsKpiOverview
@@ -253,9 +289,10 @@ export function AnalyticsPage() {
       {/* ── 8. MAITRI VS BHARATI (If not already shown in BOTH mode, show toggleable reference) ── */}
       {stationViewMode !== "BOTH" && (
         <StationComparisonPanel
-          comparison={MAITRI_VS_BHARATI_COMPARISON}
+          comparison={comparison}
         />
       )}
+
 
       {/* ── 9. OPERATIONAL INSIGHTS ─────────────────────────────────── */}
       <OperationalInsightsPanel

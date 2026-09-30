@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useSyncExternalStore } from "react";
+import Link from "next/link";
 import { useStationStore } from "@/stores/useStationStore";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { StationId } from "@repo/shared/enums";
-import { Globe2, Clock, Radio } from "lucide-react";
+import { Globe2, Clock, Radio, Compass } from "lucide-react";
 
 function subscribeClock(callback: () => void) {
   const interval = setInterval(callback, 1000);
@@ -21,6 +23,7 @@ function getServerSnapshot() {
 export function TopNavBar() {
   const activeStation = useStationStore((s) => s.activeStation);
   const setActiveStation = useStationStore((s) => s.setActiveStation);
+  const { activeTerminal, user } = useAuthStore();
   const utcTime = useSyncExternalStore(subscribeClock, getUtcTimeSnapshot, getServerSnapshot);
 
   return (
@@ -113,6 +116,25 @@ export function TopNavBar() {
           <Clock className="w-3 h-3 text-cyan-400" />
           <span>{utcTime}</span>
         </div>
+
+        {/* Workstation Terminal Badge / Switcher */}
+        <Link
+          href="/login"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-[10.5px] font-bold text-cyan-200 transition-all shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+          title="Switch Workstation Terminal or Log In via Supabase"
+        >
+          <Compass className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="hidden sm:inline">
+            {activeTerminal === "MAITRI"
+              ? "LAPTOP 1: MAITRI"
+              : activeTerminal === "BHARATI"
+              ? "LAPTOP 2: BHARATI"
+              : "LAPTOP 3: HQ TWIN"}
+          </span>
+          <span className="text-[9px] text-cyan-400/80 font-normal hidden lg:inline">
+            ({user?.name?.split(" ")[0] || "Auth"})
+          </span>
+        </Link>
       </div>
     </header>
   );

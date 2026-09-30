@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { EnergyAnalytics, TimeframeOption } from "@/features/analytics/types";
 import { SvgAreaChart } from "./charts/SvgAreaChart";
-import { Zap, ShieldCheck, Sun, Flame } from "lucide-react";
+import { Zap, ShieldCheck, Sun, Flame, AlertTriangle, ExternalLink } from "lucide-react";
 
 interface EnergyAnalyticsPanelProps {
   energy: EnergyAnalytics;
@@ -66,6 +67,33 @@ export function EnergyAnalyticsPanel({ energy, stationName }: EnergyAnalyticsPan
           ))}
         </div>
       </div>
+
+      {/* Active Alert Correlation Ribbon */}
+      {energy.activeAlerts && energy.activeAlerts.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/40 shadow-[0_0_15px_rgba(244,63,94,0.15)] text-xs">
+          <div className="flex items-center gap-2 text-rose-300">
+            <AlertTriangle className="w-4 h-4 text-rose-400 animate-pulse shrink-0" />
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-extrabold text-[11px] tracking-wide text-rose-200">
+                ⚠️ {energy.activeAlerts.length} CORRELATED POWER ALERT{energy.activeAlerts.length > 1 ? "S" : ""} ACTIVE:
+              </span>
+              <span className="text-[11px] text-slate-300 font-medium">
+                {energy.activeAlerts[0].title}
+              </span>
+              <span className="text-[9.5px] text-slate-400">
+                ({energy.activeAlerts[0].timestamp})
+              </span>
+            </div>
+          </div>
+          <Link
+            href={`/alerts?stationId=${stationName}`}
+            className="px-2.5 py-1 rounded-lg bg-rose-900/60 hover:bg-rose-800 border border-rose-400/40 text-[10px] font-bold text-rose-100 flex items-center justify-center gap-1 cursor-pointer transition-all shrink-0"
+          >
+            <span>VIEW ALERTS</span>
+            <ExternalLink className="w-3 h-3" />
+          </Link>
+        </div>
+      )}
 
       {/* Top Stat Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">

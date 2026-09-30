@@ -1,8 +1,10 @@
+import { Suspense } from "react";
+import { MaintenanceManager } from "@/components/maintenance";
+
 export default function MaintenancePage() {
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Maintenance</h1>
-      {/* TODO: Work orders, scheduling, asset health */}
-    </div>
+    <Suspense fallback={<div className="p-8 text-center text-xs font-mono text-slate-400">Loading maintenance subsystem...</div>}>
+      <MaintenanceManager />
+    </Suspense>
   );
 }

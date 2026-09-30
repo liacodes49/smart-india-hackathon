@@ -40,6 +40,12 @@ export const RISK_PROTOTYPE_ASSUMPTIONS = [
 ];
 
 export class RiskService {
+  private riskCache = new Map<string, { assessment: StationRiskAssessment; cachedAt: number }>();
+  private readonly CACHE_TTL_MS = 30000; // 30 seconds
+  clearCache(): void {
+    this.riskCache.clear();
+  }
+
   /**
    * Assess holistic operational risk for an Antarctic research station
    */
@@ -47,6 +53,13 @@ export class RiskService {
     stationId: string,
     weightsOverride?: RiskWeightsInput
   ): Promise<StationRiskAssessment> {
+    if (!weightsOverride) {
+      const cached = this.riskCache.get(stationId);
+      if (cached && Date.now() - cached.cachedAt < this.CACHE_TTL_MS) {
+        return cached.assessment;
+      }
+    }
+
     const station = await stationsRepository.findById(stationId);
     if (!station) {
       throw new Error(`Station not found: ${stationId}`);
@@ -312,6 +325,8 @@ export class RiskService {
         },
       })
     );
+
+    this.riskCache.set(stationId, { assessment, cachedAt: Date.now() });
 
     return assessment;
   }

@@ -1,8 +1,12 @@
+import React from "react";
+import type { Metadata } from "next";
+import { PredictionsDashboard } from "@/components/predictions";
+
+export const metadata: Metadata = {
+  title: "AI Predictions & Prognostics — NCPOR Antarctic Digital Twin",
+  description: "AI-driven Remaining Useful Life (RUL) estimation, degradation forecasting, and fuel autonomy projection",
+};
+
 export default function PredictionsPage() {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Predictions</h1>
-      {/* TODO: Anomaly detection, failure prediction, energy forecast */}
-    </div>
-  );
+  return <PredictionsDashboard />;
 }

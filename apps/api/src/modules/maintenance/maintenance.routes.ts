@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { maintenanceController } from './maintenance.controller.js';
-import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { optionalAuthMiddleware } from '../../middleware/auth.middleware.js';
 import { validate } from '../../middleware/validation.middleware.js';
 import {
   createMaintenanceSchema,
@@ -16,31 +16,32 @@ const router = Router();
 
 router.get(
   '/',
-  authMiddleware,
+  optionalAuthMiddleware,
   validate(maintenanceQuerySchema, 'query'),
   maintenanceController.list
 );
 
-router.get('/:id', authMiddleware, maintenanceController.getById);
+router.get('/:id', optionalAuthMiddleware, maintenanceController.getById);
 
 router.post(
   '/',
-  authMiddleware,
+  optionalAuthMiddleware,
   validate(createMaintenanceSchema),
   maintenanceController.create
 );
 
 router.put(
   '/:id',
-  authMiddleware,
+  optionalAuthMiddleware,
   validate(updateMaintenanceSchema),
   maintenanceController.update
 );
 
 router.post(
   '/:id/approve',
-  authMiddleware,
+  optionalAuthMiddleware,
   maintenanceController.approve
 );
 
 export const maintenanceRoutes: Router = router;
+

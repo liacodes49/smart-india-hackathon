@@ -6,7 +6,7 @@
 
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { db } from '../../config/database.js';
-import { alerts } from '../../db/schema/index.js';
+import { alerts, users } from '../../db/schema/index.js';
 import type { AlertSeverity, AlertStatus, AlertCategory } from '@repo/shared';
 
 export type AlertInsert = typeof alerts.$inferInsert;
@@ -24,6 +24,17 @@ export interface FindAlertsFilter {
 }
 
 export class AlertsRepository {
+  private async resolveValidUserId(userId?: string): Promise<string | null> {
+    if (userId) {
+      const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+      if (existingUser.length > 0) {
+        return existingUser[0].id;
+      }
+    }
+    const firstUser = await db.select({ id: users.id }).from(users).limit(1);
+    return firstUser[0]?.id ?? null;
+  }
+
   async findAll(filters?: FindAlertsFilter): Promise<{ data: AlertSelect[]; total: number }> {
     const conditions = [];
 
@@ -104,9 +115,11 @@ export class AlertsRepository {
     return updated ?? null;
   }
 
-  async acknowledge(id: string, userId: string, notes?: string): Promise<AlertSelect | null> {
+  async acknowledge(id: string, userId?: string, notes?: string): Promise<AlertSelect | null> {
     const existing = await this.findById(id);
     if (!existing) return null;
+
+    const validUserId = await this.resolveValidUserId(userId);
 
     const metadata = {
       ...(existing.metadata as Record<string, unknown> ?? {}),
@@ -117,7 +130,7 @@ export class AlertsRepository {
       .update(alerts)
       .set({
         status: 'ACKNOWLEDGED',
-        acknowledgedBy: userId,
+        acknowledgedBy: validUserId,
         acknowledgedAt: new Date(),
         metadata,
         updatedAt: new Date(),
@@ -131,6 +144,8 @@ export class AlertsRepository {
     const existing = await this.findById(id);
     if (!existing) return null;
 
+    const validUserId = await this.resolveValidUserId(userId);
+
     const metadata = {
       ...(existing.metadata as Record<string, unknown> ?? {}),
       resolutionNotes: notes,
@@ -140,7 +155,7 @@ export class AlertsRepository {
       .update(alerts)
       .set({
         status: 'RESOLVED',
-        resolvedBy: userId ?? null,
+        resolvedBy: validUserId,
         resolvedAt: new Date(),
         metadata,
         updatedAt: new Date(),

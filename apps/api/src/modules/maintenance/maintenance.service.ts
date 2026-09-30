@@ -12,6 +12,7 @@ import {
   MaintenanceType,
   MaintenancePriority,
   MaintenanceStatus,
+  AlertStatus,
 } from '@repo/shared';
 import type {
   CreateMaintenanceInput,
@@ -25,6 +26,8 @@ import {
   type MaintenanceRecordSelect,
 } from './maintenance.repository.js';
 import { assetsRepository } from '../assets/assets.repository.js';
+import { stationsRepository } from '../stations/stations.repository.js';
+
 
 export interface CreateRecommendationParams {
   stationId: string;
@@ -145,8 +148,11 @@ export class MaintenanceService {
       throw new Error(`Asset not found: ${input.assetId}`);
     }
 
+    const station = await stationsRepository.findById(input.stationId);
+    const resolvedStationId = station ? station.id : input.stationId;
+
     const record = await this.repo.create({
-      stationId: input.stationId,
+      stationId: resolvedStationId,
       assetId: input.assetId,
       title: input.title,
       description: input.description,
@@ -162,11 +168,12 @@ export class MaintenanceService {
       createDomainEvent({
         eventType: EventType.MAINTENANCE_SCHEDULED,
         source: 'maintenance-service',
-        stationId: input.stationId,
+        stationId: resolvedStationId,
         entityId: record.id,
         payload: record,
       })
     );
+
 
     return record;
   }
@@ -205,6 +212,34 @@ export class MaintenanceService {
           payload: updated,
         })
       );
+
+      // Cross-module synchronization: Auto-resolve active alerts linked to this asset
+      if (record.assetId) {
+        try {
+          const { alertsRepository } = await import('../alerts/alerts.repository.js');
+          const { alertsService } = await import('../alerts/alerts.service.js');
+          const activeAlerts = await alertsRepository.findAll({
+            assetId: record.assetId,
+            stationId: record.stationId,
+            limit: 50,
+          });
+          const pending = activeAlerts.data.filter(
+            (a) =>
+              a.status === AlertStatus.ACTIVE ||
+              a.status === AlertStatus.ACKNOWLEDGED ||
+              a.status === AlertStatus.ESCALATED
+          );
+          for (const alert of pending) {
+            await alertsService.resolveAlert(
+              alert.id,
+              input.assignedTo || 'Station Engineer',
+              `Auto-resolved on completion of maintenance order "${record.title}" (${id})`
+            );
+          }
+        } catch (err) {
+          console.error('[MaintenanceService] Error auto-resolving linked alerts:', err);
+        }
+      }
     } else {
       eventBus.publish(
         createDomainEvent({
@@ -227,8 +262,14 @@ export class MaintenanceService {
   async list(
     query?: MaintenanceQueryInput
   ): Promise<{ data: MaintenanceRecordSelect[]; total: number }> {
+    let resolvedStationId = query?.stationId;
+    if (resolvedStationId) {
+      const station = await stationsRepository.findById(resolvedStationId);
+      if (station) resolvedStationId = station.id;
+    }
+
     return this.repo.findAll({
-      stationId: query?.stationId,
+      stationId: resolvedStationId,
       assetId: query?.assetId,
       type: query?.type as MaintenanceType | undefined,
       priority: query?.priority as MaintenancePriority | undefined,
@@ -238,5 +279,6 @@ export class MaintenanceService {
     });
   }
 }
+
 
 export const maintenanceService = new MaintenanceService();

@@ -18,6 +18,7 @@ describe('Station Health & Composite Risk Engine', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    riskService.clearCache();
 
     vi.spyOn(stationsRepository, 'findById').mockResolvedValue({
       id: mockStationId,

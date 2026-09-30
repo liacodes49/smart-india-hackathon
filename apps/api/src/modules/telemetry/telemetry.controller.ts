@@ -3,6 +3,7 @@ import { telemetryService } from './telemetry.service.js';
 import { telemetrySimulator, SimulationScenario } from '../../services/telemetry/simulator.js';
 import { logger } from '../../config/logger.js';
 import { formatResponse, formatError } from '../../utils/index.js';
+import { eventBus } from '../../lib/event-bus.js';
 
 function getParam(param: string | string[] | undefined): string {
   if (Array.isArray(param)) return param[0] ?? '';
@@ -10,6 +11,94 @@ function getParam(param: string | string[] | undefined): string {
 }
 
 export const telemetryController = {
+  stream: (req: Request, res: Response) => {
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    logger.info(`[SSE] Client connected: ${req.ip}`);
+
+    // Send initial connection heartbeat
+    res.write('event: ping\ndata: connected\n\n');
+
+    // Set of domain event types forwarded to connected clients
+    const sseEventTypes = new Set([
+      'TELEMETRY_READING_RECORDED',
+      'TELEMETRY_BATCH_RECORDED',
+      'alert.triggered',
+      'alert.acknowledged',
+      'alert.resolved',
+      'alert.escalated',
+      'ALERT_TRIGGERED',
+      'ALERT_ACKNOWLEDGED',
+      'ALERT_RESOLVED',
+      'ALERT_ESCALATED',
+      'maintenance.recommended',
+      'maintenance.scheduled',
+      'maintenance.completed',
+      'maintenance.updated',
+      'MAINTENANCE_RECOMMENDED',
+      'MAINTENANCE_SCHEDULED',
+      'MAINTENANCE_COMPLETED',
+      'MAINTENANCE_UPDATED',
+      'equipment.health_degraded',
+      'EQUIPMENT_HEALTH_DEGRADED',
+      'risk.score_updated',
+      'RISK_SCORE_UPDATED',
+      'incident.reported',
+      'INCIDENT_REPORTED',
+      'weather.observation_recorded',
+      'WEATHER_OBSERVATION_RECORDED',
+    ]);
+
+    // Keep-alive heartbeat interval every 20 seconds
+    const heartbeatTimer = setInterval(() => {
+      try {
+        res.write(': keep-alive\n\n');
+      } catch {
+        // Ignored if socket closed
+      }
+    }, 20000);
+
+    // Subscribe to mission-critical events
+    const unsubscribe = eventBus.subscribeAll((event) => {
+      if (sseEventTypes.has(event.eventType)) {
+        const normalizedType = event.eventType.includes('.')
+          ? event.eventType.toUpperCase().replace(/\./g, '_')
+          : event.eventType;
+
+        const payload = {
+          eventType: event.eventType,
+          stationId: event.stationId,
+          entityId: event.entityId,
+          occurredAt: event.occurredAt,
+          data: event.payload,
+        };
+
+        try {
+          res.write(`event: ${normalizedType}\n`);
+          res.write(`data: ${JSON.stringify(payload)}\n\n`);
+
+          if (normalizedType !== event.eventType) {
+            res.write(`event: ${event.eventType}\n`);
+            res.write(`data: ${JSON.stringify(payload)}\n\n`);
+          }
+        } catch (err) {
+          logger.warn('[SSE] Failed to write event to client:', err);
+        }
+      }
+    });
+
+    // Cleanup on disconnect
+    req.on('close', () => {
+      clearInterval(heartbeatTimer);
+      logger.info(`[SSE] Client disconnected: ${req.ip}`);
+      unsubscribe();
+    });
+  },
+
   list: async (req: Request, res: Response) => {
     try {
       const { stationId, sensorId, assetId, startDate, endDate, status, order, page, limit } = req.query;

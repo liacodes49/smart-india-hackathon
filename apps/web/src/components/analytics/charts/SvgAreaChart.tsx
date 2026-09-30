@@ -125,10 +125,10 @@ export function SvgAreaChart({
         </defs>
 
         {/* Horizontal grid lines & Y-axis labels */}
-        {gridTicks.map((val) => {
+        {gridTicks.map((val, idx) => {
           const y = getY(val);
           return (
-            <g key={val} className="text-slate-600">
+            <g key={`grid-tick-${idx}-${val}`} className="text-slate-600">
               <line
                 x1={paddingLeft}
                 y1={y}
@@ -145,6 +145,7 @@ export function SvgAreaChart({
                 textAnchor="end"
                 fontSize="9"
                 fill="#64748b"
+                suppressHydrationWarning
               >
                 {val}
               </text>
@@ -218,6 +219,7 @@ export function SvgAreaChart({
               textAnchor="middle"
               fontSize="9"
               fill="#64748b"
+              suppressHydrationWarning
             >
               {d.timestamp}
             </text>

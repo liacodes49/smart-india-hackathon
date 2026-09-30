@@ -31,6 +31,31 @@ import { analyticsRoutes } from '../modules/analytics/analytics.routes.js';
 
 const router = Router();
 
+// API Index Root
+router.get('/', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      name: 'Antarctic Digital Twin API Surface',
+      version: '0.2.0',
+      status: 'operational',
+      endpoints: {
+        health: '/api/v1/health',
+        digitalTwin: '/api/v1/digital-twin/stations/:stationId',
+        stations: '/api/v1/stations',
+        telemetry: '/api/v1/telemetry',
+        alerts: '/api/v1/alerts',
+        energy: '/api/v1/energy',
+        inventory: '/api/v1/inventory',
+        simulations: '/api/v1/simulations',
+        incidents: '/api/v1/incidents',
+        weather: '/api/v1/weather',
+      },
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Health check
 router.get('/health', (_req, res) => {
   res.json({

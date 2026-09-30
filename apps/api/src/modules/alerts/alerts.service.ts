@@ -6,7 +6,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { alertsRepository, FindAlertsFilter, AlertSelect } from './alerts.repository.js';
+import { stationsRepository } from '../stations/stations.repository.js';
 import { eventBus } from '../../lib/event-bus.js';
+
 import { createDomainEvent, EventType, AlertSeverity, AlertCategory, SensorType } from '@repo/shared';
 import type { CreateAlertInput, AcknowledgeAlertInput } from '@repo/schemas';
 import type { SensorSelect } from '../sensors/sensors.repository.js';
@@ -56,7 +58,14 @@ function mapSensorTypeToAlertCategory(type: SensorType | string): AlertCategory 
 
 export class AlertsService {
   async getAlerts(filters?: FindAlertsFilter) {
-    return alertsRepository.findAll(filters);
+    let resolvedFilters = filters ? { ...filters } : undefined;
+    if (resolvedFilters?.stationId) {
+      const station = await stationsRepository.findById(resolvedFilters.stationId);
+      if (station) {
+        resolvedFilters.stationId = station.id;
+      }
+    }
+    return alertsRepository.findAll(resolvedFilters);
   }
 
   async getAlertById(id: string): Promise<AlertSelect | null> {
@@ -64,8 +73,11 @@ export class AlertsService {
   }
 
   async createAlert(input: CreateAlertInput, userId?: string): Promise<AlertSelect> {
+    const station = await stationsRepository.findById(input.stationId);
+    const stationId = station ? station.id : input.stationId;
+
     const created = await alertsRepository.create({
-      stationId: input.stationId,
+      stationId,
       sensorId: input.sensorId ?? null,
       assetId: input.assetId ?? null,
       title: input.title,
@@ -73,6 +85,7 @@ export class AlertsService {
       severity: input.severity as any,
       status: 'ACTIVE',
       category: input.category as any,
+
     });
 
     await eventBus.publish(

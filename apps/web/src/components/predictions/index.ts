@@ -1,2 +1,1 @@
-// Prediction components: cards, confidence meters
-export {};
+export { PredictionsDashboard } from './PredictionsDashboard';

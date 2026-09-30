@@ -1,6 +1,6 @@
 "use client";
 
-import { Html } from "@react-three/drei";
+import { Billboard, Text } from "@react-three/drei";
 
 interface StationLabelProps {
     name: string;
@@ -14,60 +14,30 @@ export default function StationLabel({
     position,
 }: StationLabelProps) {
     return (
-        <Html
-            position={position}
-            center
-            distanceFactor={8}
-            zIndexRange={[10, 0]}
-            style={{
-                pointerEvents: "none",
-            }}
-        >
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "3px",
-                    whiteSpace: "nowrap",
-                    transform: "translateY(-50%)",
-                }}
+        <Billboard position={position}>
+            <Text
+                fontSize={0.9}
+                color="#f8fafc"
+                anchorX="center"
+                anchorY="middle"
+                outlineWidth={0.06}
+                outlineColor="#020617"
             >
-                <div
-                    style={{
-                        padding: "5px 9px",
-                        borderRadius: "7px",
-                        border: "1px solid rgba(148, 163, 184, 0.28)",
-                        background: "rgba(2, 6, 23, 0.82)",
-                        color: "#f8fafc",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        letterSpacing: "0.02em",
-                        boxShadow:
-                            "0 6px 20px rgba(0, 0, 0, 0.35)",
-                        backdropFilter: "blur(8px)",
-                    }}
+                {name}
+            </Text>
+            {subtitle && (
+                <Text
+                    position={[0, -0.6, 0]}
+                    fontSize={0.45}
+                    color="#7dd3fc"
+                    anchorX="center"
+                    anchorY="middle"
+                    outlineWidth={0.04}
+                    outlineColor="#0f172a"
                 >
-                    {name}
-                </div>
-
-                {subtitle && (
-                    <div
-                        style={{
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            background:
-                                "rgba(15, 23, 42, 0.72)",
-                            color: "#7dd3fc",
-                            fontSize: "8px",
-                            fontWeight: 700,
-                            letterSpacing: "0.16em",
-                        }}
-                    >
-                        {subtitle}
-                    </div>
-                )}
-            </div>
-        </Html>
+                    {subtitle}
+                </Text>
+            )}
+        </Billboard>
     );
 }

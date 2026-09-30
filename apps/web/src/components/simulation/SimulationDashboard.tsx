@@ -2,16 +2,14 @@
 
 import React, { useState } from "react";
 import { useStationStore } from "@/stores/useStationStore";
-import { StationId } from "@repo/shared/enums";
-import {
-  SCENARIO_PRESETS,
-  runWhatIfSimulation,
-} from "@/features/simulation/simulationEngine";
+import { StationId, SimulationType, SimulationStatus } from "@repo/shared/enums";
+import { SCENARIO_PRESETS } from "@/features/simulation/simulationEngine";
+import { Simulation } from "@repo/shared/types";
 import {
   ScenarioPreset,
-  DetailedSimulationRun,
   SimulationParametersConfig,
 } from "@/features/simulation/types";
+import { apiClient } from "@/lib/api";
 import { ScenarioPresetSelector } from "./ScenarioPresetSelector";
 import { SimulationParameterForm } from "./SimulationParameterForm";
 import { SimulationResultsView } from "./SimulationResultsView";
@@ -44,32 +42,41 @@ export function SimulationDashboard() {
   const [isRunning, setIsRunning] = useState<boolean>(false);
 
   // Active & historical simulation runs
-  const [latestSimulation, setLatestSimulation] =
-    useState<DetailedSimulationRun>(() =>
-      runWhatIfSimulation(
-        activeStation,
-        SCENARIO_PRESETS[0].type,
-        SCENARIO_PRESETS[0].title,
-        SCENARIO_PRESETS[0].description,
-        SCENARIO_PRESETS[0].defaultParams
-      )
-    );
+  const [latestSimulation, setLatestSimulation] = useState<Simulation | null>(null);
+  const [historyRuns, setHistoryRuns] = useState<Simulation[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
-  const [historyRuns, setHistoryRuns] = useState<DetailedSimulationRun[]>([
-    latestSimulation,
-  ]);
+  // Fetch history when station changes
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const res = await apiClient.simulation.list({ stationId: activeStation, limit: 10 });
+        if (mounted && res.success && res.data) {
+          // Type assertion since res.data is generic unknown in the client type
+          const runs = res.data as Simulation[];
+          setHistoryRuns(runs);
+          if (runs.length > 0) {
+            setLatestSimulation(runs[0]);
+          } else {
+            setLatestSimulation(null);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load simulation history:", err);
+      } finally {
+        if (mounted) setIsLoadingHistory(false);
+      }
+    };
+    fetchHistory();
+    return () => { mounted = false; };
+  }, [activeStation]);
 
   // Handle station selection with immediate recalculation
   const handleStationChange = (station: StationId) => {
     setActiveStation(station);
-    const result = runWhatIfSimulation(
-      station,
-      selectedPreset.type,
-      scenarioName,
-      scenarioDesc,
-      parameters
-    );
-    setLatestSimulation(result);
+    // History is refetched automatically via useEffect
   };
 
   // Handle preset selection
@@ -86,23 +93,37 @@ export function SimulationDashboard() {
   };
 
   // Run Simulation handler
-  const handleRunSimulation = () => {
+  const handleRunSimulation = async () => {
     setIsRunning(true);
+    try {
+      // 1. Create Simulation
+      const createRes = await apiClient.simulation.create({
+        stationId: activeStation,
+        name: scenarioName,
+        type: selectedPreset.type,
+        description: scenarioDesc,
+        parameters,
+      });
 
-    // Realistic computation time simulation
-    setTimeout(() => {
-      const result = runWhatIfSimulation(
-        activeStation,
-        selectedPreset.type,
-        scenarioName,
-        scenarioDesc,
-        parameters
-      );
+      if (!createRes.success || !createRes.data) {
+        throw new Error("Failed to create simulation");
+      }
 
-      setLatestSimulation(result);
-      setHistoryRuns((prev) => [result, ...prev.slice(0, 4)]);
+      const simId = (createRes.data as Simulation).id;
+
+      // 2. Run Simulation
+      const runRes = await apiClient.simulation.run(simId);
+      
+      if (runRes.success && runRes.data) {
+        const completedSim = runRes.data as Simulation;
+        setLatestSimulation(completedSim);
+        setHistoryRuns((prev) => [completedSim, ...prev].slice(0, 10));
+      }
+    } catch (err) {
+      console.error("Simulation run failed:", err);
+    } finally {
       setIsRunning(false);
-    }, 600);
+    }
   };
 
   return (
@@ -206,7 +227,16 @@ export function SimulationDashboard() {
       )}
 
       {/* ── 4. Previous Simulation History Runs ─────────────────────── */}
-      {historyRuns.length > 1 && (
+      {isLoadingHistory ? (
+        <div className="p-4 text-center text-slate-500 text-xs font-mono animate-pulse border border-white/[0.05] rounded-2xl">
+          Loading simulation history from database...
+        </div>
+      ) : historyRuns.length === 0 && !isRunning ? (
+        <div className="p-5 text-center border border-dashed border-white/[0.08] rounded-2xl">
+          <p className="text-slate-500 text-xs font-mono">No simulations run yet for this station.</p>
+          <p className="text-slate-600 text-[10px] mt-1">Configure parameters above and click RUN.</p>
+        </div>
+      ) : historyRuns.length > 0 && (
         <section
           aria-label="Simulation Run History"
           className="p-4 rounded-2xl border border-white/[0.08] bg-[#080d16]/90 backdrop-blur-md flex flex-col gap-3"
@@ -231,11 +261,15 @@ export function SimulationDashboard() {
               >
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-cyan-400 font-bold">[{run.stationId}]</span>
+                    <span className="text-cyan-400 font-bold">[{run.type}]</span>
                     <span className="text-slate-200 font-bold">{run.name}</span>
                   </div>
-                  <span className="text-[9.5px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-                    {run.type}
+                  <span className={`text-[9.5px] px-2 py-0.5 rounded border font-bold ${
+                    run.status === 'COMPLETED' ? 'bg-emerald-950 text-emerald-400 border-emerald-500/40' :
+                    run.status === 'FAILED' ? 'bg-rose-950 text-rose-400 border-rose-500/40' :
+                    'bg-slate-900 text-slate-400 border-slate-800'
+                  }`}>
+                    {run.status}
                   </span>
                 </div>
 
@@ -244,38 +278,40 @@ export function SimulationDashboard() {
                     <span className="text-slate-400 text-[9.5px]">Impact: </span>
                     <span
                       className={`font-bold ${
-                        run.metrics.impactScore > 70
+                        (run.results?.impactScore ?? 0) > 70
                           ? "text-rose-400"
-                          : run.metrics.impactScore > 40
+                          : (run.results?.impactScore ?? 0) > 40
                           ? "text-amber-400"
                           : "text-emerald-400"
                       }`}
                     >
-                      {run.metrics.impactScore}/100
+                      {run.results?.impactScore ?? '—'}/100
                     </span>
                   </div>
 
                   <div>
                     <span className="text-slate-400 text-[9.5px]">Demand: </span>
                     <span className="font-bold text-amber-300">
-                      {run.metrics.simulatedPowerDemandKw} kW
+                      {run.results?.deltas?.powerDemandKw?.projected ?? '—'} kW
                     </span>
                   </div>
 
                   <div>
                     <span className="text-slate-400 text-[9.5px]">Endurance: </span>
                     <span className="font-bold text-blue-300">
-                      {run.metrics.projectedDaysRemaining}d
+                      {run.results?.deltas?.daysToDepletion?.projected ?? '—'}d
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setLatestSimulation(run)}
-                    className="px-2 py-1 rounded text-[9.5px] font-bold bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 transition-colors cursor-pointer"
-                  >
-                    INSPECT
-                  </button>
+                  {run.status === 'COMPLETED' && (
+                    <button
+                      type="button"
+                      onClick={() => setLatestSimulation(run)}
+                      className="px-2 py-1 rounded text-[9.5px] font-bold bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 transition-colors cursor-pointer"
+                    >
+                      INSPECT
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -4,7 +4,7 @@ import { useRef } from "react";
 
 import { useFrame } from "@react-three/fiber";
 
-import { Html } from "@react-three/drei";
+import { Billboard, Text } from "@react-three/drei";
 
 import * as THREE from "three";
 
@@ -316,31 +316,18 @@ export function StationMarker({
             )}
 
             {/* Station label */}
-            <Html
-                position={[
-                    0,
-                    3.8,
-                    0,
-                ]}
-                center
-                distanceFactor={30}
-            >
-                <div
-                    style={{
-                        color: "white",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        whiteSpace:
-                            "nowrap",
-                        textShadow:
-                            "0 0 4px black",
-                        pointerEvents:
-                            "none",
-                    }}
+            <Billboard position={[0, 3.8, 0]}>
+                <Text
+                    fontSize={1.2}
+                    color="white"
+                    anchorX="center"
+                    anchorY="middle"
+                    outlineWidth={0.08}
+                    outlineColor="#000000"
                 >
                     {name}
-                </div>
-            </Html>
+                </Text>
+            </Billboard>
         </group>
     );
 }

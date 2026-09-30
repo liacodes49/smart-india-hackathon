@@ -1,8 +1,10 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useStationStore, type ViewMode, type CameraPreset } from "@/stores/useStationStore";
 import { STATIONS } from "@repo/shared/constants";
+import AntarcticaOverview from "@/components/digital-twin/AntarcticaOverview";
 import {
   Box,
   Layers,
@@ -15,6 +17,7 @@ import {
   Fuel,
   Home,
   Truck,
+  Maximize2,
 } from "lucide-react";
 
 const VIEW_MODES: { id: ViewMode; label: string }[] = [
@@ -148,54 +151,16 @@ export function DigitalTwinPanel() {
         </div>
       )}
 
-      {/* 3. Main Viewport Integration Area (Clean Canvas Container Placeholder) */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
-        {/* Subtle decorative grid reticle backdrop */}
-        <div
-          className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-
-        {/* Polar radial atmospheric glow */}
-        <div className="absolute w-96 h-96 rounded-full bg-cyan-500/[0.04] blur-3xl pointer-events-none" />
-
-        {/* Viewport Placeholder Core */}
-        <div className="relative z-10 flex flex-col items-center max-w-md p-6 rounded-2xl border border-white/[0.06] bg-[#050a14]/60 backdrop-blur-sm">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-950/50 border border-cyan-500/20 text-cyan-400 mb-3 shadow-[0_0_25px_rgba(6,182,212,0.15)]">
-            <Box className="w-6 h-6 text-cyan-300" />
-          </div>
-
-          <h2 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
-            DIGITAL TWIN
-          </h2>
-          <p className="text-xs text-cyan-400/90 font-medium mt-1">
-            Awaiting 3D station scene
-          </p>
-          <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-            Integration boundary ready. The Three.js Digital Twin viewport will mount inside this
-            container, bound to active station [{activeStation}], view mode [{viewMode}], and camera
-            preset [{cameraPreset}].
-          </p>
-
-          <div className="mt-4 pt-3 border-t border-white/[0.06] w-full flex items-center justify-center gap-3 text-[10px] text-slate-400">
-            <span>State: BOUNDED</span>
-            <span>•</span>
-            <span>Camera: {cameraPreset}</span>
-            <span>•</span>
-            <span>Shading: {viewMode}</span>
-          </div>
-        </div>
+      {/* 3. Main Viewport Integration Area: Live Interactive 3D Digital Twin */}
+      <div className="flex-1 w-full min-h-[460px] relative overflow-hidden bg-black flex flex-col">
+        <AntarcticaOverview embedded initialStationId={activeStation} />
       </div>
 
       {/* 4. Bottom Viewport Telemetry Status Ticker */}
-      <div className="flex items-center justify-between border-t border-white/[0.06] bg-[#050912]/80 px-4 py-2 backdrop-blur-md text-[10px] text-slate-400 z-20">
+      <div className="flex items-center justify-between border-t border-white/[0.06] bg-[#050912]/90 px-4 py-2 backdrop-blur-md text-[10px] text-slate-400 z-20 font-mono">
         <div className="flex items-center gap-2">
           <Compass className="w-3.5 h-3.5 text-cyan-400" />
-          <span>POLAR VIRTUAL HORIZON</span>
+          <span className="font-bold text-slate-300">POLAR VIRTUAL HORIZON</span>
           <span className="text-slate-600">|</span>
           <span className="text-slate-400">
             {activeStation === "MAITRI" ? "Schirmacher Oasis (Inland)" : "Larsemann Hills (Coastal)"}
@@ -203,7 +168,13 @@ export function DigitalTwinPanel() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-slate-400">Raycasting & asset selection listener standby</span>
+          <Link
+            href="/digital-twin"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 text-[10px] font-bold transition-colors cursor-pointer shadow-sm"
+          >
+            <Maximize2 className="w-3 h-3 text-cyan-300" />
+            <span>FULLSCREEN TWIN</span>
+          </Link>
         </div>
       </div>
     </section>

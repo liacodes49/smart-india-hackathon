@@ -1,12 +1,12 @@
 import type { ApiClient } from './client.js';
-import { API_ROUTES } from '@repo/shared';
+import { API_ROUTES, type SpatialStationState, type SpatialTwinNode } from '@repo/shared';
 
 export function createDigitalTwinApi(client: ApiClient) {
   return {
     getStationTwin: (stationId: string) =>
-      client.get(`${API_ROUTES.DIGITAL_TWIN}/stations/${stationId}`),
+      client.get<SpatialStationState>(`${API_ROUTES.DIGITAL_TWIN}/stations/${stationId}`),
 
     getZoneTwin: (stationId: string, zoneId: string) =>
-      client.get(`${API_ROUTES.DIGITAL_TWIN}/stations/${stationId}/zones/${zoneId}`),
+      client.get<SpatialTwinNode>(`${API_ROUTES.DIGITAL_TWIN}/stations/${stationId}/zones/${zoneId}`),
   };
 }

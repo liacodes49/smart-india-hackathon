@@ -17,6 +17,12 @@ export interface StationStoreState {
   cameraPreset: CameraPreset;
   focusAssetRequest: string | null;
 
+  // Cross-system real-time signals
+  activeAlertCount: number;
+  criticalAlertCount: number;
+  isLiveConnected: boolean;
+  lastTelemetryTimestamp: number | null;
+
   // Actions
   setActiveStation: (station: StationId) => void;
   setSelectedAsset: (assetId: string | null) => void;
@@ -26,6 +32,9 @@ export interface StationStoreState {
   clearAssetFocus: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setAlertCounts: (active: number, critical?: number) => void;
+  setLiveConnected: (connected: boolean) => void;
+  recordTelemetryTick: () => void;
 }
 
 export const useStationStore = create<StationStoreState>((set) => ({
@@ -35,6 +44,11 @@ export const useStationStore = create<StationStoreState>((set) => ({
   viewMode: 'NORMAL',
   cameraPreset: 'OVERVIEW',
   focusAssetRequest: null,
+
+  activeAlertCount: 0,
+  criticalAlertCount: 0,
+  isLiveConnected: false,
+  lastTelemetryTimestamp: null,
 
   setActiveStation: (station: StationId) =>
     set({ activeStation: station, selectedAssetId: null, focusAssetRequest: null }),
@@ -59,4 +73,13 @@ export const useStationStore = create<StationStoreState>((set) => ({
 
   setSidebarCollapsed: (collapsed: boolean) =>
     set({ isSidebarCollapsed: collapsed }),
+
+  setAlertCounts: (active: number, critical = 0) =>
+    set({ activeAlertCount: active, criticalAlertCount: critical }),
+
+  setLiveConnected: (connected: boolean) =>
+    set({ isLiveConnected: connected }),
+
+  recordTelemetryTick: () =>
+    set({ lastTelemetryTimestamp: Date.now(), isLiveConnected: true }),
 }));

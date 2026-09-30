@@ -18,10 +18,13 @@ import type { CreateSimulationInput, SimulationQueryInput } from '@repo/schemas'
 import { eventBus } from '../../lib/event-bus.js';
 import { logger } from '../../config/logger.js';
 import { stationsRepository } from '../stations/stations.repository.js';
+import { db } from '../../config/database.js';
+import { users } from '../../db/schema/index.js';
 import { energyService } from '../energy/energy.service.js';
 import { fuelForecastingService } from '../predictions/fuel.service.js';
 import { weatherService } from '../weather/weather.service.js';
 import { riskService } from '../risk/risk.service.js';
+import { alertsService } from '../alerts/alerts.service.js';
 import {
   simulationRepository,
   type SimulationSelect,
@@ -37,21 +40,29 @@ export class SimulationService {
    */
   async createSimulation(
     input: CreateSimulationInput,
-    userId: string
+    userId: string | null
   ): Promise<SimulationSelect> {
     const station = await stationsRepository.findById(input.stationId);
     if (!station) {
       throw new Error(`Station not found: ${input.stationId}`);
     }
 
+    // Resolve userId: use provided auth user, or fall back to first system user
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      const [systemUser] = await db.select({ id: users.id }).from(users).limit(1);
+      if (!systemUser) throw new Error('No users in database. Run: pnpm db:seed');
+      resolvedUserId = systemUser.id;
+    }
+
     const sim = await simulationRepository.create({
-      stationId: input.stationId,
+      stationId: station.id, // always use the UUID FK, not the station code
       name: input.name,
       type: input.type as any,
       description: input.description,
       status: SimulationStatus.DRAFT as any,
       parameters: input.parameters,
-      createdBy: userId,
+      createdBy: resolvedUserId,
     });
 
     eventBus.publish(
@@ -124,6 +135,21 @@ export class SimulationService {
         })
       );
 
+      // If scenario reveals severe vulnerability / impact, raise a simulation advisory alert
+      if (results.impactScore >= 60) {
+        try {
+          await alertsService.createAlert({
+            stationId: sim.stationId,
+            title: `[SIMULATION ADVISORY] High Impact: ${sim.name}`,
+            message: `What-If scenario projection (${sim.type}): ${results.summary}. Impact Score: ${results.impactScore}/100.`,
+            severity: results.impactScore >= 80 ? 'CRITICAL' : 'WARNING',
+            category: (sim.type === 'EQUIPMENT_FAILURE' ? 'EQUIPMENT' : sim.type === 'WEATHER_EXTREME' ? 'ENVIRONMENTAL' : 'POWER') as any,
+          });
+        } catch (alertErr) {
+          logger.warn(`Could not emit simulation advisory alert:`, alertErr);
+        }
+      }
+
       return updated!;
     } catch (error: any) {
       logger.error(`Simulation '${id}' execution failed:`, error);
@@ -171,6 +197,13 @@ export class SimulationService {
    * List simulations with filtering & pagination
    */
   async listSimulations(filter?: SimulationQueryInput) {
+    // Resolve station code (e.g. "MAITRI") to UUID if provided
+    if (filter?.stationId) {
+      const station = await stationsRepository.findById(filter.stationId);
+      if (station) {
+        filter = { ...filter, stationId: station.id };
+      }
+    }
     return simulationRepository.findAll(filter);
   }
 

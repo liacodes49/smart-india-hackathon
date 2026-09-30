@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createSimulationSchema = z.object({
-  stationId: z.string().uuid(),
+  stationId: z.string().min(1), // accepts UUID or station code like 'MAITRI'
   name: z.string().min(3).max(200),
   type: z.enum([
     'POWER_FAILURE',
@@ -17,7 +17,7 @@ export const createSimulationSchema = z.object({
 export type CreateSimulationInput = z.infer<typeof createSimulationSchema>;
 
 export const simulationQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
   type: z
     .enum([
       'POWER_FAILURE',
@@ -35,7 +35,7 @@ export const simulationQuerySchema = z.object({
 export type SimulationQueryInput = z.infer<typeof simulationQuerySchema>;
 
 export const quickRunSimulationSchema = z.object({
-  stationId: z.string().uuid(),
+  stationId: z.string().min(1), // accepts UUID or station code like 'MAITRI'
   type: z.enum([
     'POWER_FAILURE',
     'EQUIPMENT_FAILURE',

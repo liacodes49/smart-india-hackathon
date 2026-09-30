@@ -1,2 +1,1 @@
-// Telemetry components: gauges, charts, data grids
-export {};
+export { TelemetryControlCenter } from './TelemetryControlCenter';

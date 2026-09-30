@@ -55,18 +55,50 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(url.toString(), {
-      method,
-      headers,
-      body: options?.body ? JSON.stringify(options.body) : undefined,
-    });
+    let response: Response | undefined;
+    let lastError: any;
+    const maxAttempts = method === 'GET' ? 2 : 1;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        response = await fetch(url.toString(), {
+          method,
+          headers,
+          body: options?.body ? JSON.stringify(options.body) : undefined,
+        });
+        break;
+      } catch (networkError: any) {
+        lastError = networkError;
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+      }
+    }
+
+    if (!response) {
+      throw new Error(
+        `API Connection Failed: Unable to reach ${method} ${url.toString()} (${lastError?.message || 'Network error'})`
+      );
+    }
 
     if (response.status === 401) {
       this.onUnauthorized?.();
     }
 
     if (!response.ok) {
-      const error = (await response.json()) as ApiError;
+      let error: ApiError;
+      try {
+        error = (await response.json()) as ApiError;
+      } catch {
+        error = {
+          success: false,
+          error: {
+            code: 'HTTP_ERROR',
+            message: `Request failed with status ${response.status}: ${response.statusText}`,
+          },
+          timestamp: new Date().toISOString(),
+        };
+      }
       throw error;
     }
 

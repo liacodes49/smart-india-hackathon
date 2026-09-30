@@ -1,9 +1,9 @@
 import rateLimit from 'express-rate-limit';
 
-/** General API rate limiter — 100 requests per 15 minutes per IP */
+/** General API rate limiter — 100 requests per 15 min in prod, 10,000 in dev */
 export const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: process.env.NODE_ENV === 'development' ? 10000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

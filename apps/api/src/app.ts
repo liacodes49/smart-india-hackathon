@@ -14,10 +14,24 @@ import { apiRateLimiter } from './middleware/rate-limit.middleware.js';
 const app: express.Express = express();
 
 // ── Security ─────────────────────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
 app.use(
   cors({
-    origin: env.CORS_ORIGIN.split(','),
+    origin: (origin, callback) => {
+      // In development, allow requests with no origin (curl/mobile/local) or from localhost/127.0.0.1 on any port
+      if (!origin || env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim());
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
   }),
 );

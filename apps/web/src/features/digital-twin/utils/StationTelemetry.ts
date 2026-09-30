@@ -34,7 +34,7 @@ export const INITIAL_TELEMETRY: TelemetryAsset[] = [
         power: 68,
         fuel: 0,
         water: 82,
-        lastUpdated: Date.now(),
+        lastUpdated: 0,
     },
     {
         id: "fuel-farm",
@@ -45,7 +45,7 @@ export const INITIAL_TELEMETRY: TelemetryAsset[] = [
         power: 0,
         fuel: 76,
         water: 0,
-        lastUpdated: Date.now(),
+        lastUpdated: 0,
     },
     {
         id: "generator",
@@ -56,7 +56,7 @@ export const INITIAL_TELEMETRY: TelemetryAsset[] = [
         power: 68,
         fuel: 71,
         water: 0,
-        lastUpdated: Date.now(),
+        lastUpdated: 0,
     },
     {
         id: "pump-house",
@@ -67,7 +67,7 @@ export const INITIAL_TELEMETRY: TelemetryAsset[] = [
         power: 24,
         fuel: 0,
         water: 82,
-        lastUpdated: Date.now(),
+        lastUpdated: 0,
     },
     {
         id: "container-01",
@@ -78,7 +78,7 @@ export const INITIAL_TELEMETRY: TelemetryAsset[] = [
         power: 8,
         fuel: 0,
         water: 24,
-        lastUpdated: Date.now(),
+        lastUpdated: 0,
     },
     {
         id: "antenna",
@@ -89,7 +89,7 @@ export const INITIAL_TELEMETRY: TelemetryAsset[] = [
         power: 4,
         fuel: 0,
         water: 0,
-        lastUpdated: Date.now(),
+        lastUpdated: 0,
     },
 ];
 

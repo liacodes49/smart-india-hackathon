@@ -2,39 +2,44 @@
 // @repo/api-client — Complete Typed SDK for Frontend & UI Team
 // ═══════════════════════════════════════════════════════════════
 
-import { ApiClient, type ClientConfig } from './client.js';
-import { createStationsApi } from './stations.js';
-import { createTelemetryApi } from './telemetry.js';
-import { createAlertsApi } from './alerts.js';
-import { createEnergyApi } from './energy.js';
-import { createInventoryApi } from './inventory.js';
-import { createWeatherApi } from './weather.js';
-import { createPredictionsApi } from './predictions.js';
-import { createSimulationApi } from './simulation.js';
-import { createDigitalTwinApi } from './digital-twin.js';
-import { createIncidentsApi } from './incidents.js';
-import { createAssistantApi } from './assistant.js';
-import { createEdgeApi } from './edge.js';
-import { createGatewayApi } from './gateway.js';
-import { createAnalyticsApi } from './analytics.js';
+import { ApiClient, type ClientConfig } from './client';
+import { createStationsApi } from './stations';
+import { createTelemetryApi } from './telemetry';
+import { createAlertsApi } from './alerts';
+import { createEnergyApi } from './energy';
+import { createInventoryApi } from './inventory';
+import { createWeatherApi } from './weather';
+import { createPredictionsApi } from './predictions';
+import { createSimulationApi } from './simulation';
+import { createDigitalTwinApi } from './digital-twin';
+import { createIncidentsApi } from './incidents';
+import { createAssistantApi } from './assistant';
+import { createEdgeApi } from './edge';
+import { createGatewayApi } from './gateway';
+import { createAnalyticsApi } from './analytics';
+import { createMaintenanceApi } from './maintenance';
+import { createSensorsApi } from './sensors';
 
-export { ApiClient } from './client.js';
-export type { ClientConfig } from './client.js';
+export { ApiClient } from './client';
+export type { ClientConfig } from './client';
 
-export { createStationsApi } from './stations.js';
-export { createTelemetryApi } from './telemetry.js';
-export { createAlertsApi } from './alerts.js';
-export { createEnergyApi } from './energy.js';
-export { createInventoryApi } from './inventory.js';
-export { createWeatherApi } from './weather.js';
-export { createPredictionsApi } from './predictions.js';
-export { createSimulationApi } from './simulation.js';
-export { createDigitalTwinApi } from './digital-twin.js';
-export { createIncidentsApi } from './incidents.js';
-export { createAssistantApi } from './assistant.js';
-export { createEdgeApi } from './edge.js';
-export { createGatewayApi } from './gateway.js';
-export { createAnalyticsApi } from './analytics.js';
+export { createStationsApi } from './stations';
+export { createTelemetryApi } from './telemetry';
+export { createAlertsApi } from './alerts';
+export { createEnergyApi } from './energy';
+export { createInventoryApi } from './inventory';
+export { createWeatherApi } from './weather';
+export { createPredictionsApi } from './predictions';
+export { createSimulationApi } from './simulation';
+export { createDigitalTwinApi } from './digital-twin';
+export { createIncidentsApi } from './incidents';
+export { createAssistantApi } from './assistant';
+export { createEdgeApi } from './edge';
+export { createGatewayApi } from './gateway';
+export { createAnalyticsApi } from './analytics';
+export { createMaintenanceApi } from './maintenance';
+export { createSensorsApi } from './sensors';
+
 
 /**
  * Unified Typed Antarctic Digital Twin Client SDK
@@ -56,6 +61,8 @@ export class AntarcticTwinClient {
   public readonly edge: ReturnType<typeof createEdgeApi>;
   public readonly gateway: ReturnType<typeof createGatewayApi>;
   public readonly analytics: ReturnType<typeof createAnalyticsApi>;
+  public readonly maintenance: ReturnType<typeof createMaintenanceApi>;
+  public readonly sensors: ReturnType<typeof createSensorsApi>;
 
   constructor(config: ClientConfig) {
     this.client = new ApiClient(config);
@@ -74,7 +81,11 @@ export class AntarcticTwinClient {
     this.edge = createEdgeApi(this.client);
     this.gateway = createGatewayApi(this.client);
     this.analytics = createAnalyticsApi(this.client);
+    this.maintenance = createMaintenanceApi(this.client);
+    this.sensors = createSensorsApi(this.client);
   }
+
+
 
   setToken(token: string): void {
     this.client.setToken(token);

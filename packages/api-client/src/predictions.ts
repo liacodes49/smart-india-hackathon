@@ -11,5 +11,8 @@ export function createPredictionsApi(client: ApiClient) {
 
     getFuelDepletion: (stationId: string) =>
       client.get(`${API_ROUTES.PREDICTIONS}/stations/${stationId}/fuel-forecast`),
+
+    evaluate: (data: { stationId: string; type: string; assetId?: string; sensorId?: string }) =>
+      client.post(`${API_ROUTES.PREDICTIONS}/evaluate`, data),
   };
 }

@@ -52,12 +52,12 @@ export function FuelAnalyticsPanel({ fuel, stationName }: FuelAnalyticsPanelProp
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
         <div className="p-3 rounded-xl bg-slate-950/70 border border-white/[0.05] flex flex-col justify-between">
           <span className="text-[10px] text-slate-400">Current Reserve</span>
-          <div className="my-1">
+          <div className="my-1" suppressHydrationWarning>
             <span className="text-lg font-bold text-cyan-400">
-              {fuel.currentReserveLitres.toLocaleString()} L
+              {fuel.currentReserveLitres.toLocaleString("en-US")} L
             </span>
             <span className="text-[9.5px] text-slate-400 block mt-0.5">
-              {fuel.reservePercent}% of {fuel.totalCapacityLitres.toLocaleString()} L
+              {fuel.reservePercent}% of {fuel.totalCapacityLitres.toLocaleString("en-US")} L
             </span>
           </div>
           <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-1 border border-white/[0.04]">
@@ -70,9 +70,9 @@ export function FuelAnalyticsPanel({ fuel, stationName }: FuelAnalyticsPanelProp
 
         <div className="p-3 rounded-xl bg-slate-950/70 border border-white/[0.05] flex flex-col justify-between">
           <span className="text-[10px] text-slate-400">Daily Consumption</span>
-          <div className="my-1">
+          <div className="my-1" suppressHydrationWarning>
             <span className="text-lg font-bold text-amber-400">
-              {fuel.dailyConsumptionLitres.toLocaleString()} L/d
+              {fuel.dailyConsumptionLitres.toLocaleString("en-US")} L/d
             </span>
             <span className="text-[9.5px] text-slate-400 block mt-0.5">
               ~{(fuel.dailyConsumptionLitres / 24).toFixed(1)} L/hour burn

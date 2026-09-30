@@ -251,6 +251,7 @@ export interface SimulationResult {
   impactScore: number;
   affectedSystems: string[];
   recommendations: string[];
+  timeline?: SimulationTimelineEvent[];
   deltas: SimulationDeltas;
   timelineSteps: SimulationTimelineStep[];
   mitigations: SimulationMitigation[];
@@ -336,6 +337,8 @@ export interface SpatialStationState {
   };
   stationHealthScore: number;
   riskLevel: RiskLevel;
+  riskAssessment?: StationRiskAssessment;
+  edgeStatus: 'ONLINE' | 'DEGRADED' | 'BLACKOUT';
   rootNodes: SpatialTwinNode[];
   generatedAt: string;
 }

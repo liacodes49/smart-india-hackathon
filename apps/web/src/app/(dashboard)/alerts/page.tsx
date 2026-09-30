@@ -1,8 +1,10 @@
+import { Suspense } from "react";
+import { AlertsManager } from "@/components/alerts";
+
 export default function AlertsPage() {
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Alerts</h1>
-      {/* TODO: Alert list, filters, acknowledge/resolve actions */}
-    </div>
+    <Suspense fallback={<div className="p-8 text-center text-xs font-mono text-slate-400">Loading alerts engine...</div>}>
+      <AlertsManager />
+    </Suspense>
   );
 }

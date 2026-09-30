@@ -21,7 +21,9 @@ function generate24hEnergy(baseDemand: number, baseGen: number): EnergyDataPoint
 
   hours.forEach((time, index) => {
     // Peak heating demand occurs in early morning and late evening
-    const factor = Math.sin((index / 12) * Math.PI * 2 - 1.2) * 12 + (Math.random() * 4 - 2);
+    // Deterministic diurnal noise based on index to guarantee 100% identical SSR & client hydration
+    const noise = ((index * 7) % 5) - 2;
+    const factor = Math.sin((index / 12) * Math.PI * 2 - 1.2) * 12 + noise;
     const demand = Math.round(baseDemand + factor);
     const gen = Math.round(baseGen + factor * 0.95);
     const renewable = Math.round(Math.max(0, 18 + Math.sin((index / 12) * Math.PI) * 14));

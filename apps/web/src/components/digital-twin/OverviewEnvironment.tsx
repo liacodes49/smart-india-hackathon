@@ -7,6 +7,7 @@ import * as THREE from "three";
 
 interface OverviewEnvironmentProps {
     timeOfDay: number;
+    environment?: any;
 }
 
 function getLightingState(
@@ -68,6 +69,7 @@ function getLightingState(
 
 export default function OverviewEnvironment({
     timeOfDay,
+    environment,
 }: OverviewEnvironmentProps) {
     const ambientRef =
         useRef<THREE.AmbientLight>(null);
@@ -171,19 +173,21 @@ export default function OverviewEnvironment({
             {/* Polar night / day background */}
             <color
                 attach="background"
-                args={["#020617"]}
+                args={[
+                    environment?.condition === "BLIZZARD" || environment?.condition === "KATABATIC_GALE" 
+                    ? "#4a5a6a" 
+                    : "#020617"
+                ]}
             />
 
             <fog
                 attach="fog"
                 args={[
-                    "#020617",
-                    twilight
-                        ? 36
-                        : 42,
-                    twilight
-                        ? 78
-                        : 90,
+                    environment?.condition === "BLIZZARD" || environment?.condition === "KATABATIC_GALE" 
+                    ? "#4a5a6a" 
+                    : "#020617",
+                    (twilight ? 36 : 42) * (environment?.blizzardVisibilityFactor ?? 1),
+                    (twilight ? 78 : 90) * (environment?.blizzardVisibilityFactor ?? 1),
                 ]}
             />
 

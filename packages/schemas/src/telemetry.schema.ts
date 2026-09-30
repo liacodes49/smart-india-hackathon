@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const telemetryReadingSchema = z.object({
   sensorId: z.string().uuid(),
-  stationId: z.string().uuid(),
+  stationId: z.string().min(1),
   timestamp: z.string().datetime(),
   value: z.number(),
   unit: z.string().min(1),
@@ -17,7 +17,8 @@ export const telemetryBatchSchema = z.object({
 export type TelemetryBatchInput = z.infer<typeof telemetryBatchSchema>;
 
 export const telemetryQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
+
   sensorId: z.string().uuid().optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),

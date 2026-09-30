@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { sensorsRepository, FindSensorsFilter, SensorSelect } from './sensors.repository.js';
+import { stationsRepository } from '../stations/stations.repository.js';
 import { eventBus } from '../../lib/event-bus.js';
 import { createDomainEvent, EventType, SensorStatus } from '@repo/shared';
 import type { CreateSensorInput, UpdateSensorInput } from '@repo/schemas';
@@ -15,8 +16,16 @@ export const SENSOR_OFFLINE_THRESHOLD_MS = 5 * 60 * 1000;
 
 export class SensorsService {
   async getSensors(filters?: FindSensorsFilter) {
-    return sensorsRepository.findAll(filters);
+    let resolvedFilters = filters ? { ...filters } : undefined;
+    if (resolvedFilters?.stationId) {
+      const station = await stationsRepository.findById(resolvedFilters.stationId);
+      if (station) {
+        resolvedFilters.stationId = station.id;
+      }
+    }
+    return sensorsRepository.findAll(resolvedFilters);
   }
+
 
   async getSensorById(id: string): Promise<SensorSelect | null> {
     return sensorsRepository.findById(id);

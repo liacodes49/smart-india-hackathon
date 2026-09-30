@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createAlertSchema = z.object({
-  stationId: z.string().uuid(),
+  stationId: z.string().min(1),
   sensorId: z.string().uuid().optional(),
   assetId: z.string().uuid().optional(),
   title: z.string().min(5).max(200),
@@ -18,7 +18,8 @@ export const acknowledgeAlertSchema = z.object({
 export type AcknowledgeAlertInput = z.infer<typeof acknowledgeAlertSchema>;
 
 export const alertQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
+
   severity: z.enum(['INFO', 'WARNING', 'CRITICAL', 'EMERGENCY']).optional(),
   status: z.enum(['ACTIVE', 'ACKNOWLEDGED', 'RESOLVED', 'ESCALATED', 'DISMISSED']).optional(),
   category: z

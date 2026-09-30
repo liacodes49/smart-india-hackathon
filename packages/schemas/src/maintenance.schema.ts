@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createMaintenanceSchema = z.object({
-  stationId: z.string().uuid(),
+  stationId: z.string().min(1),
   assetId: z.string().uuid(),
   title: z.string().min(5).max(200),
   description: z.string().min(10).max(2000),
@@ -20,7 +20,8 @@ export const updateMaintenanceSchema = createMaintenanceSchema.partial().extend(
 export type UpdateMaintenanceInput = z.infer<typeof updateMaintenanceSchema>;
 
 export const maintenanceQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
+
   assetId: z.string().uuid().optional(),
   type: z.enum(['PREVENTIVE', 'CORRECTIVE', 'PREDICTIVE', 'EMERGENCY']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),

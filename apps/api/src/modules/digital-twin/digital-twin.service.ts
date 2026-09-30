@@ -25,12 +25,22 @@ import { sensorsRepository } from '../sensors/sensors.repository.js';
 import { alertsRepository } from '../alerts/alerts.repository.js';
 import { weatherService } from '../weather/weather.service.js';
 import { riskService } from '../risk/risk.service.js';
+import { edgeService } from '../edge/edge.service.js';
 
 export class DigitalTwinService {
+  private stateCache = new Map<string, { state: SpatialStationState; cachedAt: number }>();
+  private readonly CACHE_TTL_MS = 5000; // 5 seconds
+
   /**
    * Assemble complete 2D/3D spatial operational state for a station
    */
   async getSpatialStationState(stationIdOrCode: string): Promise<SpatialStationState> {
+    const cacheKey = stationIdOrCode.toUpperCase();
+    const cached = this.stateCache.get(cacheKey);
+    if (cached && Date.now() - cached.cachedAt < this.CACHE_TTL_MS) {
+      return cached.state;
+    }
+
     const station = await stationsRepository.findById(stationIdOrCode);
     if (!station) {
       throw new Error(`Station '${stationIdOrCode}' not found`);
@@ -94,10 +104,13 @@ export class DigitalTwinService {
       // Building coordinates
       const bCoords = this.parseBuildingCoordinates(b.coordinates, bIdx);
       const bRooms = b.rooms ?? [];
+      const buildingOnlyAssets = assetsByBuildingOnly.get(b.id) ?? [];
 
       const roomNodes: SpatialTwinNode[] = bRooms.map((r, rIdx) => {
         const rCoords = this.deriveRoomCoordinates(r, rIdx, bRooms.length);
-        const roomAssets = assetsByRoom.get(r.id) ?? [];
+        const directRoomAssets = assetsByRoom.get(r.id) ?? [];
+        // If this is the first room in the building, also house the building-level assets
+        const roomAssets = rIdx === 0 ? [...directRoomAssets, ...buildingOnlyAssets] : directRoomAssets;
 
         const assetNodes: SpatialTwinNode[] = roomAssets.map((a, aIdx) => {
           const aCoords = this.deriveAssetCoordinates(a, aIdx, roomAssets.length);
@@ -191,7 +204,10 @@ export class DigitalTwinService {
     const weatherCondition = (weather?.condition as WeatherCondition) ?? WeatherCondition.OVERCAST;
     const isBlizzard = weatherCondition === WeatherCondition.BLIZZARD || weatherCondition === WeatherCondition.KATABATIC_GALE;
 
-    return {
+    // 4. Edge Connectivity State
+    const edgeState = await edgeService.getConnectivity(station.id);
+
+    const result: SpatialStationState = {
       stationId: station.id,
       name: station.name,
       latitude: station.latitude,
@@ -207,9 +223,16 @@ export class DigitalTwinService {
       },
       stationHealthScore: 100 - (risk?.compositeScore ?? 25),
       riskLevel: risk?.riskLevel ?? RiskLevel.LOW,
+      riskAssessment: risk ?? undefined,
+      edgeStatus: edgeState.state as any,
       rootNodes,
       generatedAt: new Date().toISOString(),
     };
+
+    this.stateCache.set(cacheKey, { state: result, cachedAt: Date.now() });
+    this.stateCache.set(station.id, { state: result, cachedAt: Date.now() });
+
+    return result;
   }
 
   /**
