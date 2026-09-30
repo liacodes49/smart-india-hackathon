@@ -29,7 +29,7 @@ export class StationsRepository {
   }
 
   async findById(idOrCode: string): Promise<StationSelect | null> {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idOrCode);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrCode);
     if (isUuid) {
       const rows = await db
         .select()
@@ -58,15 +58,12 @@ export class StationsRepository {
 
     const buildingsWithRooms = await Promise.all(
       stationBuildings.map(async (b) => {
-        const buildingRooms = await db
-          .select()
-          .from(rooms)
-          .where(eq(rooms.buildingId, b.id));
+        const buildingRooms = await db.select().from(rooms).where(eq(rooms.buildingId, b.id));
         return {
           ...b,
           rooms: buildingRooms,
         };
-      })
+      }),
     );
 
     return {

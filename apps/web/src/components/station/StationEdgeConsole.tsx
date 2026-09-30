@@ -167,8 +167,17 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
       const targetUnit = normalizeUnit(unit);
 
       const findSensor = (list: typeof sensors) => {
+        const expectedDbId =
+          stationId === 'MAITRI'
+            ? '00000000-0000-0000-0000-000000000001'
+            : '00000000-0000-0000-0000-000000000002';
+        const stationSensors = list.filter(
+          (s) => !s.stationId || s.stationId === stationId || s.stationId === expectedDbId,
+        );
+        const searchPool = stationSensors.length > 0 ? stationSensors : list;
+
         // Strategy 1: Find sensor matching both metric name substring AND unit
-        let t = list.find(
+        let t = searchPool.find(
           (s) =>
             s.name.toLowerCase().includes(metricName.toLowerCase()) &&
             normalizeUnit(s.unit) === targetUnit,
@@ -177,7 +186,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
         // Strategy 2: If no exact name+unit match, match by unit and keyword overlap
         if (!t) {
           const keywords = metricName.toLowerCase().split(/\s+/);
-          t = list.find(
+          t = searchPool.find(
             (s) =>
               normalizeUnit(s.unit) === targetUnit &&
               keywords.some((k) => s.name.toLowerCase().includes(k)),
@@ -186,7 +195,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
 
         // Strategy 3: Match purely by exact unit if unambiguous
         if (!t) {
-          const matchingByUnit = list.filter((s) => normalizeUnit(s.unit) === targetUnit);
+          const matchingByUnit = searchPool.filter((s) => normalizeUnit(s.unit) === targetUnit);
           if (matchingByUnit.length === 1) {
             t = matchingByUnit[0];
           }
