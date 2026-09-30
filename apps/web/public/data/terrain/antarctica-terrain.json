@@ -1,0 +1,15 @@
+{
+  "projection": "EPSG:3031",
+  "source": "NSIDC-0756 BedMachine Antarctica v4.1",
+  "resolution": 1024,
+  "width": 1024,
+  "height": 1024,
+  "minElevation": 0.0,
+  "maxElevation": 4622.72900390625,
+  "bounds": {
+    "minX": -2561393.847914468,
+    "maxX": 2677178.6022271723,
+    "minY": -2172511.8168471223,
+    "maxY": 2236266.736300808
+  }
+}
