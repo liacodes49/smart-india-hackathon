@@ -47,6 +47,22 @@ app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use('/api', apiRateLimiter);
 
 // ── Routes ───────────────────────────────────────────────────
+app.get('/', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      service: 'Antarctic Digital Twin API Backend',
+      version: '0.2.0',
+      status: 'operational',
+      frontendUrl: 'http://localhost:3000',
+      apiDocs: '/api/v1',
+      health: '/api/v1/health',
+      note: 'To use the graphical dashboard and 3D digital twin, please visit the frontend at http://localhost:3000',
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use('/api/v1', apiRouter);
 
 // ── 404 Handler ──────────────────────────────────────────────
