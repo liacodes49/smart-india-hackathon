@@ -144,6 +144,20 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
     return () => clearInterval(interval);
   }, [fetchHQDirectives]);
 
+  // Helper to fetch and sync fresh sensors
+  const refreshStationSensors = async (): Promise<any[]> => {
+    try {
+      const res: any = await apiClient.sensors.list({ stationId, limit: 50 });
+      if (res?.data && Array.isArray(res.data)) {
+        setSensors(res.data);
+        return res.data;
+      }
+    } catch (err) {
+      console.warn('Failed to refresh station sensors:', err);
+    }
+    return sensors;
+  };
+
   // Transmit Single Sensor Reading to DB and SSE stream
   const handleTransmitReading = async (metricName: string, value: number, unit: string) => {
     try {
@@ -152,47 +166,83 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
       const normalizeUnit = (u: string) => u.replace(/[^a-zA-Z0-9%°]/g, '').toLowerCase();
       const targetUnit = normalizeUnit(unit);
 
-      // Strategy 1: Find sensor matching both metric name substring AND unit
-      let target = sensors.find(
-        (s) =>
-          s.name.toLowerCase().includes(metricName.toLowerCase()) &&
-          normalizeUnit(s.unit) === targetUnit,
-      );
-
-      // Strategy 2: If no exact name+unit match, match by unit and keyword overlap
-      if (!target) {
-        const keywords = metricName.toLowerCase().split(/\s+/);
-        target = sensors.find(
+      const findSensor = (list: typeof sensors) => {
+        // Strategy 1: Find sensor matching both metric name substring AND unit
+        let t = list.find(
           (s) =>
-            normalizeUnit(s.unit) === targetUnit &&
-            keywords.some((k) => s.name.toLowerCase().includes(k)),
+            s.name.toLowerCase().includes(metricName.toLowerCase()) &&
+            normalizeUnit(s.unit) === targetUnit,
         );
-      }
 
-      // Strategy 3: Match purely by exact unit if unambiguous
-      if (!target) {
-        const matchingByUnit = sensors.filter((s) => normalizeUnit(s.unit) === targetUnit);
-        if (matchingByUnit.length === 1) {
-          target = matchingByUnit[0];
+        // Strategy 2: If no exact name+unit match, match by unit and keyword overlap
+        if (!t) {
+          const keywords = metricName.toLowerCase().split(/\s+/);
+          t = list.find(
+            (s) =>
+              normalizeUnit(s.unit) === targetUnit &&
+              keywords.some((k) => s.name.toLowerCase().includes(k)),
+          );
         }
+
+        // Strategy 3: Match purely by exact unit if unambiguous
+        if (!t) {
+          const matchingByUnit = list.filter((s) => normalizeUnit(s.unit) === targetUnit);
+          if (matchingByUnit.length === 1) {
+            t = matchingByUnit[0];
+          }
+        }
+        return t;
+      };
+
+      let activeSensors = sensors;
+      let target = findSensor(activeSensors);
+
+      // If no sensor in state, try refreshing first
+      if (!target) {
+        activeSensors = await refreshStationSensors();
+        target = findSensor(activeSensors);
       }
 
       // STRICT SAFETY GUARD: Under no circumstances send a reading if unit does not match target.unit
       if (target && normalizeUnit(target.unit) === targetUnit) {
-        await apiClient.telemetry.ingest({
-          sensorId: target.id,
-          stationId,
-          timestamp: new Date().toISOString(),
-          value,
-          unit: target.unit, // always use the registered sensor unit
-          status:
-            value >= (target.criticalThreshold ?? 90)
-              ? 'CRITICAL'
-              : value >= (target.warningThreshold ?? 80)
-                ? 'WARNING'
-                : 'NORMAL',
-          quality: 100,
-        });
+        const sendPayload = async (t: typeof target) => {
+          if (!t) return;
+          await apiClient.telemetry.ingest({
+            sensorId: t.id,
+            stationId,
+            timestamp: new Date().toISOString(),
+            value,
+            unit: t.unit, // always use the registered sensor unit
+            status:
+              value >= (t.criticalThreshold ?? 90)
+                ? 'CRITICAL'
+                : value >= (t.warningThreshold ?? 80)
+                  ? 'WARNING'
+                  : 'NORMAL',
+            quality: 100,
+          });
+        };
+
+        try {
+          await sendPayload(target);
+        } catch (txErr: any) {
+          // If sensor was not found in registry (e.g. database was reseeded), refresh and retry once
+          const isNotFound =
+            txErr?.status === 404 ||
+            (txErr?.message && txErr.message.includes('not found in registry'));
+          if (isNotFound) {
+            activeSensors = await refreshStationSensors();
+            target = findSensor(activeSensors);
+            if (target && normalizeUnit(target.unit) === targetUnit) {
+              await sendPayload(target);
+            } else {
+              throw txErr;
+            }
+          } else {
+            throw txErr;
+          }
+        }
+
         const logEntry = `[TX → GOA HQ]: ${metricName} = ${value} ${unit} (ACK via ${target.name})`;
         setTxLogs((prev) => [logEntry, ...prev.slice(0, 15)]);
       } else {
@@ -225,78 +275,97 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
       setIsTransmitting(true);
       const normalizeUnit = (u: string) => u.replace(/[^a-zA-Z0-9%°]/g, '').toLowerCase();
 
+      const executeAnomalyTx = async (
+        findSensorFn: (list: any[]) => any,
+        val: number,
+        txStatus: 'WARNING' | 'CRITICAL',
+        successLog: string,
+      ) => {
+        let list = sensors;
+        let s = findSensorFn(list);
+        if (!s) {
+          list = await refreshStationSensors();
+          s = findSensorFn(list);
+        }
+        if (!s) return;
+
+        try {
+          await apiClient.telemetry.ingest({
+            sensorId: s.id,
+            stationId,
+            timestamp: new Date().toISOString(),
+            value: val,
+            unit: s.unit,
+            status: txStatus,
+            quality: 100,
+          });
+        } catch (txErr: any) {
+          const isNotFound =
+            txErr?.status === 404 ||
+            (txErr?.message && txErr.message.includes('not found in registry'));
+          if (isNotFound) {
+            list = await refreshStationSensors();
+            s = findSensorFn(list);
+            if (s) {
+              await apiClient.telemetry.ingest({
+                sensorId: s.id,
+                stationId,
+                timestamp: new Date().toISOString(),
+                value: val,
+                unit: s.unit,
+                status: txStatus,
+                quality: 100,
+              });
+            }
+          } else {
+            throw txErr;
+          }
+        }
+        setTxLogs((prev) => [successLog, ...prev.slice(0, 15)]);
+      };
+
       if (scenario === 'GEN_CRITICAL') {
         setGen1Temp(94.5);
         setGenPowerKw(145);
-        const sensor =
-          sensors.find(
-            (s) => s.type === 'TEMPERATURE' && s.name.toLowerCase().includes('coolant'),
-          ) || sensors.find((s) => s.type === 'TEMPERATURE');
-        if (sensor) {
-          await apiClient.telemetry.ingest({
-            sensorId: sensor.id,
-            stationId,
-            timestamp: new Date().toISOString(),
-            value: 94.5,
-            unit: sensor.unit,
-            status: 'CRITICAL',
-            quality: 100,
-          });
-        }
-        setTxLogs((prev) => [
+        await executeAnomalyTx(
+          (list) =>
+            list.find(
+              (s) => s.type === 'TEMPERATURE' && s.name.toLowerCase().includes('coolant'),
+            ) || list.find((s) => s.type === 'TEMPERATURE'),
+          94.5,
+          'CRITICAL',
           `[🚨 EMERGENCY TX]: CRITICAL Coolant Overheat Injected (94.5°C) → Dispatched to HQ!`,
-          ...prev.slice(0, 15),
-        ]);
+        );
       } else if (scenario === 'FREEZE_WATER') {
         setWaterPressureBar(0.2);
-        const sensor =
-          sensors.find(
-            (s) =>
-              (s.name.toLowerCase().includes('water') ||
-                s.type === 'WATER' ||
-                s.name.toLowerCase().includes('pump')) &&
-              !s.name.toLowerCase().includes('atmospheric') &&
-              normalizeUnit(s.unit) !== 'hpa',
-          ) || sensors.find((s) => s.type === 'WATER');
-        if (sensor) {
-          await apiClient.telemetry.ingest({
-            sensorId: sensor.id,
-            stationId,
-            timestamp: new Date().toISOString(),
-            value: 0.2,
-            unit: sensor.unit,
-            status: 'WARNING',
-            quality: 100,
-          });
-        }
-        setTxLogs((prev) => [
+        await executeAnomalyTx(
+          (list) =>
+            list.find(
+              (s) =>
+                (s.name.toLowerCase().includes('water') ||
+                  s.type === 'WATER' ||
+                  s.name.toLowerCase().includes('pump')) &&
+                !s.name.toLowerCase().includes('atmospheric') &&
+                normalizeUnit(s.unit) !== 'hpa',
+            ) || list.find((s) => s.type === 'WATER'),
+          0.2,
+          'WARNING',
           `[⚠️ WARNING TX]: Water Line Freeze / Flow Blockage Injected (0.2 bar) → Dispatched to HQ!`,
-          ...prev.slice(0, 15),
-        ]);
+        );
       } else if (scenario === 'BLIZZARD_SURGE') {
         setIndoorTemp(12.0);
-        const sensor =
-          sensors.find(
-            (s) =>
-              s.type === 'TEMPERATURE' &&
-              (s.name.toLowerCase().includes('interior') ||
-                s.name.toLowerCase().includes('ambient')),
-          ) || sensors.find((s) => s.type === 'TEMPERATURE');
-        if (sensor) {
-          await apiClient.telemetry.ingest({
-            sensorId: sensor.id,
-            stationId,
-            timestamp: new Date().toISOString(),
-            value: 12.0,
-            unit: sensor.unit,
-            status: 'WARNING',
-            quality: 100,
-          });
-        }
-        setTxLogs((prev) => [
+        await executeAnomalyTx(
+          (list) =>
+            list.find(
+              (s) =>
+                s.type === 'TEMPERATURE' &&
+                (s.name.toLowerCase().includes('interior') ||
+                  s.name.toLowerCase().includes('ambient')),
+            ) || list.find((s) => s.type === 'TEMPERATURE'),
+          12.0,
+          'WARNING',
           `[⚠️ ADVISORY TX]: Polar Cold Infiltration (12.0°C) → Dispatched to HQ!`,
-          ...prev.slice(0, 15),
-        ]);
+        );
       }
       useStationStore.getState().recordTelemetryTick();
       fetchHQDirectives();

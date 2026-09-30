@@ -23,17 +23,19 @@ export interface FindAssetsFilter {
   limit?: number;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export class AssetsRepository {
   async findAll(filters?: FindAssetsFilter): Promise<{ data: AssetSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId) {
+    if (filters?.stationId && UUID_REGEX.test(filters.stationId)) {
       conditions.push(eq(assets.stationId, filters.stationId));
     }
-    if (filters?.buildingId) {
+    if (filters?.buildingId && UUID_REGEX.test(filters.buildingId)) {
       conditions.push(eq(assets.buildingId, filters.buildingId));
     }
-    if (filters?.roomId) {
+    if (filters?.roomId && UUID_REGEX.test(filters.roomId)) {
       conditions.push(eq(assets.roomId, filters.roomId));
     }
     if (filters?.category) {
@@ -53,12 +55,7 @@ export class AssetsRepository {
     const offset = (page - 1) * limit;
 
     const [data, totalCount] = await Promise.all([
-      db
-        .select()
-        .from(assets)
-        .where(whereClause)
-        .limit(limit)
-        .offset(offset),
+      db.select().from(assets).where(whereClause).limit(limit).offset(offset),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(assets)
@@ -72,12 +69,17 @@ export class AssetsRepository {
   }
 
   async findById(id: string): Promise<AssetSelect | null> {
+    if (!id || !UUID_REGEX.test(id)) return null;
     const rows = await db.select().from(assets).where(eq(assets.id, id)).limit(1);
     return rows[0] ?? null;
   }
 
   async findByCode(code: string): Promise<AssetSelect | null> {
-    const rows = await db.select().from(assets).where(eq(assets.code, code.toUpperCase().trim())).limit(1);
+    const rows = await db
+      .select()
+      .from(assets)
+      .where(eq(assets.code, code.toUpperCase().trim()))
+      .limit(1);
     return rows[0] ?? null;
   }
 
@@ -93,6 +95,7 @@ export class AssetsRepository {
   }
 
   async update(id: string, data: Partial<AssetInsert>): Promise<AssetSelect | null> {
+    if (!id || !UUID_REGEX.test(id)) return null;
     const [updated] = await db
       .update(assets)
       .set({
@@ -106,6 +109,7 @@ export class AssetsRepository {
   }
 
   async delete(id: string): Promise<boolean> {
+    if (!id || !UUID_REGEX.test(id)) return false;
     const deleted = await db.delete(assets).where(eq(assets.id, id)).returning();
     return deleted.length > 0;
   }
@@ -119,7 +123,7 @@ export class AssetsRepository {
   async validateHierarchy(
     stationId: string,
     buildingId?: string | null,
-    roomId?: string | null
+    roomId?: string | null,
   ): Promise<{ valid: boolean; error?: string }> {
     const station = await db.select().from(stations).where(eq(stations.id, stationId)).limit(1);
     if (!station[0]) {
@@ -127,7 +131,11 @@ export class AssetsRepository {
     }
 
     if (buildingId) {
-      const building = await db.select().from(buildings).where(eq(buildings.id, buildingId)).limit(1);
+      const building = await db
+        .select()
+        .from(buildings)
+        .where(eq(buildings.id, buildingId))
+        .limit(1);
       if (!building[0]) {
         return { valid: false, error: `Building with ID '${buildingId}' does not exist` };
       }

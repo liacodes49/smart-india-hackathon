@@ -28,15 +28,23 @@ import type {
 export class AnalyticsService {
   constructor(private readonly repo: AnalyticsRepository = analyticsRepository) {}
 
+  private async resolveStation(stationId?: string) {
+    if (stationId) {
+      const station = await stationsRepository.findById(stationId);
+      if (station) return station;
+    }
+    const maitri = await stationsRepository.findById('MAITRI');
+    if (maitri) return maitri;
+    const all = await stationsRepository.findAll();
+    if (all.length > 0 && all[0]) return all[0];
+    throw new Error(`Station '${stationId || 'MAITRI'}' not found in registry`);
+  }
+
   /**
    * Bounded historical energy trend aggregation
    */
   async getEnergyTrend(query: HistoricalAnalyticsQueryInput): Promise<HistoricalEnergyTrend> {
-    const stationId = query.stationId || '00000000-0000-0000-0000-000000000001';
-    const station = await stationsRepository.findById(stationId);
-    if (!station) {
-      throw new Error(`Station '${stationId}' not found in registry`);
-    }
+    const station = await this.resolveStation(query.stationId);
 
     const start = new Date(query.startTime);
     const end = new Date(query.endTime);
@@ -89,11 +97,7 @@ export class AnalyticsService {
    * Bounded historical fuel consumption trend
    */
   async getFuelTrend(query: HistoricalAnalyticsQueryInput): Promise<HistoricalFuelTrend> {
-    const stationId = query.stationId || '00000000-0000-0000-0000-000000000001';
-    const station = await stationsRepository.findById(stationId);
-    if (!station) {
-      throw new Error(`Station '${stationId}' not found in registry`);
-    }
+    const station = await this.resolveStation(query.stationId);
 
     const start = new Date(query.startTime);
     const end = new Date(query.endTime);
@@ -136,18 +140,17 @@ export class AnalyticsService {
    * Operational reliability metrics: MTBF & MTTR based on verified incidents & repairs
    */
   async getReliabilityMetrics(query: ReliabilityQueryInput): Promise<StationReliabilityMetrics> {
-    const stationId = query.stationId || '00000000-0000-0000-0000-000000000001';
-    const station = await stationsRepository.findById(stationId);
-    if (!station) {
-      throw new Error(`Station '${stationId}' not found in registry`);
-    }
+    const station = await this.resolveStation(query.stationId);
 
     const end = query.periodEnd ? new Date(query.periodEnd) : new Date();
     const start = query.periodStart
       ? new Date(query.periodStart)
       : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000); // Default 30-day window
 
-    const totalHours = Math.max(1, Number(((end.getTime() - start.getTime()) / (1000 * 3600)).toFixed(1)));
+    const totalHours = Math.max(
+      1,
+      Number(((end.getTime() - start.getTime()) / (1000 * 3600)).toFixed(1)),
+    );
     const stats = await this.repo.getIncidentAndMaintenanceStats(station.id, start, end);
 
     // MTBF: Total operational hours / verified failure events (critical incidents)
@@ -301,7 +304,8 @@ export class AnalyticsService {
       generatedBy: userId,
       dataCompletenessPercent: 100,
       summaryMetrics,
-      content: typeof formattedContent === 'string' ? formattedContent : JSON.stringify(formattedContent),
+      content:
+        typeof formattedContent === 'string' ? formattedContent : JSON.stringify(formattedContent),
     });
 
     await eventBus.publish(
@@ -317,7 +321,7 @@ export class AnalyticsService {
           format: saved.format,
           generatedAt: saved.createdAt.toISOString(),
         },
-      })
+      }),
     );
 
     return {

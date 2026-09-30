@@ -32,6 +32,8 @@ export interface RollingStatsAggregate {
   count: number;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export class TelemetryRepository {
   /**
    * Deterministic idempotent insertion.
@@ -49,7 +51,10 @@ export class TelemetryRepository {
     return inserted ?? null;
   }
 
-  async findBySensorAndTimestamp(sensorId: string, timestamp: Date): Promise<TelemetrySelect | null> {
+  async findBySensorAndTimestamp(
+    sensorId: string,
+    timestamp: Date,
+  ): Promise<TelemetrySelect | null> {
     const rows = await db
       .select()
       .from(telemetry)
@@ -74,13 +79,15 @@ export class TelemetryRepository {
       .returning();
   }
 
-  async findAll(filters?: FindTelemetryFilter): Promise<{ data: TelemetrySelect[]; total: number }> {
+  async findAll(
+    filters?: FindTelemetryFilter,
+  ): Promise<{ data: TelemetrySelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId) {
+    if (filters?.stationId && UUID_REGEX.test(filters.stationId)) {
       conditions.push(eq(telemetry.stationId, filters.stationId));
     }
-    if (filters?.sensorId) {
+    if (filters?.sensorId && UUID_REGEX.test(filters.sensorId)) {
       conditions.push(eq(telemetry.sensorId, filters.sensorId));
     }
     if (filters?.startDate) {
@@ -94,12 +101,12 @@ export class TelemetryRepository {
     }
 
     // If assetId filter is requested, join to sensors table
-    if (filters?.assetId) {
+    if (filters?.assetId && UUID_REGEX.test(filters.assetId)) {
       const assetSensors = await db
         .select({ id: sensors.id })
         .from(sensors)
         .where(eq(sensors.assetId, filters.assetId));
-      const sensorIds = assetSensors.map(s => s.id);
+      const sensorIds = assetSensors.map((s) => s.id);
       if (sensorIds.length === 0) {
         return { data: [], total: 0 };
       }
@@ -110,7 +117,8 @@ export class TelemetryRepository {
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 50;
     const offset = (page - 1) * limit;
-    const orderDirection = filters?.order === 'asc' ? asc(telemetry.timestamp) : desc(telemetry.timestamp);
+    const orderDirection =
+      filters?.order === 'asc' ? asc(telemetry.timestamp) : desc(telemetry.timestamp);
 
     const [data, totalCount] = await Promise.all([
       db
@@ -133,11 +141,13 @@ export class TelemetryRepository {
   }
 
   async findById(id: string): Promise<TelemetrySelect | null> {
+    if (!id || !UUID_REGEX.test(id)) return null;
     const rows = await db.select().from(telemetry).where(eq(telemetry.id, id)).limit(1);
     return rows[0] ?? null;
   }
 
   async getLatestBySensor(sensorId: string): Promise<TelemetrySelect | null> {
+    if (!sensorId || !UUID_REGEX.test(sensorId)) return null;
     const rows = await db
       .select()
       .from(telemetry)
@@ -150,11 +160,7 @@ export class TelemetryRepository {
   /**
    * Database SQL aggregation across any historical time window.
    */
-  async getRollingStats(
-    sensorId: string,
-    from: Date,
-    to: Date
-  ): Promise<RollingStatsAggregate> {
+  async getRollingStats(sensorId: string, from: Date, to: Date): Promise<RollingStatsAggregate> {
     const [row] = await db
       .select({
         min: sql<number | null>`min(${telemetry.value})::float`,
@@ -167,8 +173,8 @@ export class TelemetryRepository {
         and(
           eq(telemetry.sensorId, sensorId),
           gte(telemetry.timestamp, from),
-          lte(telemetry.timestamp, to)
-        )
+          lte(telemetry.timestamp, to),
+        ),
       );
 
     return {

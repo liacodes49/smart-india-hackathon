@@ -21,14 +21,16 @@ export interface FindSensorsFilter {
   limit?: number;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export class SensorsRepository {
   async findAll(filters?: FindSensorsFilter): Promise<{ data: SensorSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId) {
+    if (filters?.stationId && UUID_REGEX.test(filters.stationId)) {
       conditions.push(eq(sensors.stationId, filters.stationId));
     }
-    if (filters?.assetId) {
+    if (filters?.assetId && UUID_REGEX.test(filters.assetId)) {
       conditions.push(eq(sensors.assetId, filters.assetId));
     }
     if (filters?.type) {
@@ -45,12 +47,7 @@ export class SensorsRepository {
     const offset = (page - 1) * limit;
 
     const [data, totalCount] = await Promise.all([
-      db
-        .select()
-        .from(sensors)
-        .where(whereClause)
-        .limit(limit)
-        .offset(offset),
+      db.select().from(sensors).where(whereClause).limit(limit).offset(offset),
       db
         .select({ count: sql<number>`count(*)::int` })
         .from(sensors)
@@ -64,11 +61,13 @@ export class SensorsRepository {
   }
 
   async findById(id: string): Promise<SensorSelect | null> {
+    if (!id || !UUID_REGEX.test(id)) return null;
     const rows = await db.select().from(sensors).where(eq(sensors.id, id)).limit(1);
     return rows[0] ?? null;
   }
 
   async findByAssetId(assetId: string): Promise<SensorSelect[]> {
+    if (!assetId || !UUID_REGEX.test(assetId)) return [];
     return db.select().from(sensors).where(eq(sensors.assetId, assetId));
   }
 
@@ -78,6 +77,7 @@ export class SensorsRepository {
   }
 
   async update(id: string, data: Partial<SensorInsert>): Promise<SensorSelect | null> {
+    if (!id || !UUID_REGEX.test(id)) return null;
     const [updated] = await db
       .update(sensors)
       .set({
@@ -93,8 +93,9 @@ export class SensorsRepository {
     id: string,
     value: number,
     status: SensorStatus,
-    timestamp: Date
+    timestamp: Date,
   ): Promise<SensorSelect | null> {
+    if (!id || !UUID_REGEX.test(id)) return null;
     const [updated] = await db
       .update(sensors)
       .set({
@@ -109,6 +110,7 @@ export class SensorsRepository {
   }
 
   async delete(id: string): Promise<boolean> {
+    if (!id || !UUID_REGEX.test(id)) return false;
     const deleted = await db.delete(sensors).where(eq(sensors.id, id)).returning();
     return deleted.length > 0;
   }
@@ -121,6 +123,8 @@ export class SensorsRepository {
   }
 
   async validateAssetAssociation(assetId: string, stationId: string): Promise<boolean> {
+    if (!assetId || !stationId || !UUID_REGEX.test(assetId) || !UUID_REGEX.test(stationId))
+      return false;
     const rows = await db
       .select()
       .from(assets)

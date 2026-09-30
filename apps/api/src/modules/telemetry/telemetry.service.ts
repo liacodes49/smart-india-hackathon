@@ -6,18 +6,20 @@
 // 24-hour rolling ring-buffer statistics, and threshold alerting.
 // ═══════════════════════════════════════════════════════════════
 
-import {
-  telemetryRepository,
+import type {
   FindTelemetryFilter,
   TelemetrySelect,
   RollingStatsAggregate,
 } from './telemetry.repository.js';
+import { telemetryRepository } from './telemetry.repository.js';
 import { sensorsRepository } from '../sensors/sensors.repository.js';
 import { stationsRepository } from '../stations/stations.repository.js';
-import { alertsService, ThresholdEvaluationResult } from '../alerts/alerts.service.js';
+import type { ThresholdEvaluationResult } from '../alerts/alerts.service.js';
+import { alertsService } from '../alerts/alerts.service.js';
 
 import { eventBus } from '../../lib/event-bus.js';
-import { createDomainEvent, EventType, TelemetrySummary, SensorType, SensorStatus } from '@repo/shared';
+import type { TelemetrySummary, SensorType } from '@repo/shared';
+import { createDomainEvent, EventType, SensorStatus } from '@repo/shared';
 import type { TelemetryReadingInput, TelemetryBatchInput } from '@repo/schemas';
 
 export interface IngestReadingResult {
@@ -63,7 +65,7 @@ export class TelemetryService {
 
     const now = Date.now();
     const cutoff = now - windowMs;
-    const windowPoints = buffer.filter(p => p.timestamp >= cutoff);
+    const windowPoints = buffer.filter((p) => p.timestamp >= cutoff);
 
     if (windowPoints.length === 0) return null;
 
@@ -102,7 +104,33 @@ export class TelemetryService {
     }
 
     // 2. Sensor verification
-    const sensor = await sensorsRepository.findById(input.sensorId);
+    let sensor = await sensorsRepository.findById(input.sensorId);
+    if (!sensor && input.stationId) {
+      // Self-healing fallback: If the client provided an outdated/stale sensorId
+      // (e.g. from an existing browser session across db reseeds),
+      // resolve the station and find the active sensor for that station matching the unit.
+      try {
+        let stationDbId = input.stationId;
+        const station = await stationsRepository.findById(input.stationId);
+        if (station) {
+          stationDbId = station.id;
+        }
+        const stationSensors = await sensorsRepository.findAll({
+          stationId: stationDbId,
+          limit: 100,
+        });
+        const receivedUnit = input.unit.replace(/[^\w%°C]/g, '').toLowerCase();
+        const candidate = stationSensors.data.find(
+          (s) => s.unit.replace(/[^\w%°C]/g, '').toLowerCase() === receivedUnit,
+        );
+        if (candidate) {
+          sensor = candidate;
+        }
+      } catch {
+        // Fallback failed, will throw error below
+      }
+    }
+
     if (!sensor) {
       throw new Error(`Sensor '${input.sensorId}' not found in registry`);
     }
@@ -133,13 +161,14 @@ export class TelemetryService {
     const expectedUnit = sensor.unit.replace(/[^\w%°C]/g, '').toLowerCase();
     const receivedUnit = input.unit.replace(/[^\w%°C]/g, '').toLowerCase();
     if (expectedUnit && receivedUnit && expectedUnit !== receivedUnit) {
-      throw new Error(`Telemetry unit mismatch: expected '${sensor.unit}', received '${input.unit}'`);
+      throw new Error(
+        `Telemetry unit mismatch: expected '${sensor.unit}', received '${input.unit}'`,
+      );
     }
-
 
     // 4. Deterministic idempotency duplicate check
     const inserted = await telemetryRepository.create({
-      sensorId: input.sensorId,
+      sensorId: sensor.id,
       stationId,
       timestamp: timestampDate,
       value: input.value,
@@ -150,7 +179,7 @@ export class TelemetryService {
 
     if (!inserted) {
       // Duplicate reading was sent! Return existing reading without mutating state or firing duplicate alert
-      const existing = await telemetryRepository.findBySensorAndTimestamp(input.sensorId, timestampDate);
+      const existing = await telemetryRepository.findBySensorAndTimestamp(sensor.id, timestampDate);
       if (!existing) {
         throw new Error('Duplicate reading detected but record could not be retrieved');
       }
@@ -165,7 +194,7 @@ export class TelemetryService {
       sensor.id,
       input.value,
       (input.status as any) ?? SensorStatus.NORMAL,
-      timestampDate
+      timestampDate,
     );
 
     // 6. Update in-memory rolling statistics cache
@@ -180,7 +209,7 @@ export class TelemetryService {
         unit: input.unit,
         timestamp: timestampDate,
       },
-      sensor
+      sensor,
     );
 
     // 8. Emit telemetry domain event
@@ -202,7 +231,7 @@ export class TelemetryService {
           alertTriggered: alertResult.breached,
           submittedBy: userId,
         },
-      })
+      }),
     );
 
     return {
@@ -265,7 +294,7 @@ export class TelemetryService {
           sensor.id,
           record.value,
           record.status as any,
-          record.timestamp
+          record.timestamp,
         );
 
         const alertRes = await alertsService.evaluateReading(
@@ -276,7 +305,7 @@ export class TelemetryService {
             unit: record.unit,
             timestamp: record.timestamp,
           },
-          sensor
+          sensor,
         );
 
         if (alertRes.breached && alertRes.isNew) {
@@ -299,7 +328,7 @@ export class TelemetryService {
             alertsTriggered,
             submittedBy: userId,
           },
-        })
+        }),
       );
     }
 
@@ -331,7 +360,7 @@ export class TelemetryService {
    */
   async getRollingStats(
     sensorId: string,
-    window: '5m' | '15m' | '1h' | '24h' = '24h'
+    window: '5m' | '15m' | '1h' | '24h' = '24h',
   ): Promise<RollingStatsAggregate & { window: string; sensorId: string }> {
     const windowMsMap: Record<string, number> = {
       '5m': 5 * 60 * 1000,
@@ -376,7 +405,10 @@ export class TelemetryService {
       }
     }
 
-    const sensorsList = await sensorsRepository.findAll({ stationId: resolvedStationId, limit: 100 });
+    const sensorsList = await sensorsRepository.findAll({
+      stationId: resolvedStationId,
+      limit: 100,
+    });
 
     const summaries: TelemetrySummary[] = [];
 

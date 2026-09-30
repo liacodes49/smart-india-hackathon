@@ -5,11 +5,7 @@
 import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { db } from '../../config/database.js';
 import { maintenanceRecords } from '../../db/schema/index.js';
-import type {
-  MaintenanceType,
-  MaintenancePriority,
-  MaintenanceStatus,
-} from '@repo/shared';
+import type { MaintenanceType, MaintenancePriority, MaintenanceStatus } from '@repo/shared';
 
 export type MaintenanceRecordInsert = typeof maintenanceRecords.$inferInsert;
 export type MaintenanceRecordSelect = typeof maintenanceRecords.$inferSelect;
@@ -24,6 +20,8 @@ export interface FindMaintenanceFilter {
   limit?: number;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export class MaintenanceRepository {
   async create(data: MaintenanceRecordInsert): Promise<MaintenanceRecordSelect> {
     const [record] = await db.insert(maintenanceRecords).values(data).returning();
@@ -31,6 +29,7 @@ export class MaintenanceRepository {
   }
 
   async findById(id: string): Promise<MaintenanceRecordSelect | null> {
+    if (!id || !UUID_REGEX.test(id)) return null;
     const [record] = await db
       .select()
       .from(maintenanceRecords)
@@ -41,14 +40,15 @@ export class MaintenanceRepository {
   }
 
   async findActiveRecommendation(assetId: string): Promise<MaintenanceRecordSelect | null> {
+    if (!assetId || !UUID_REGEX.test(assetId)) return null;
     const [record] = await db
       .select()
       .from(maintenanceRecords)
       .where(
         and(
           eq(maintenanceRecords.assetId, assetId),
-          inArray(maintenanceRecords.status, ['RECOMMENDED', 'PENDING'])
-        )
+          inArray(maintenanceRecords.status, ['RECOMMENDED', 'PENDING']),
+        ),
       )
       .limit(1);
 
@@ -57,8 +57,9 @@ export class MaintenanceRepository {
 
   async update(
     id: string,
-    data: Partial<MaintenanceRecordInsert>
+    data: Partial<MaintenanceRecordInsert>,
   ): Promise<MaintenanceRecordSelect | null> {
+    if (!id || !UUID_REGEX.test(id)) return null;
     const [record] = await db
       .update(maintenanceRecords)
       .set({
@@ -72,14 +73,14 @@ export class MaintenanceRepository {
   }
 
   async findAll(
-    filters?: FindMaintenanceFilter
+    filters?: FindMaintenanceFilter,
   ): Promise<{ data: MaintenanceRecordSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId) {
+    if (filters?.stationId && UUID_REGEX.test(filters.stationId)) {
       conditions.push(eq(maintenanceRecords.stationId, filters.stationId));
     }
-    if (filters?.assetId) {
+    if (filters?.assetId && UUID_REGEX.test(filters.assetId)) {
       conditions.push(eq(maintenanceRecords.assetId, filters.assetId));
     }
     if (filters?.type) {
