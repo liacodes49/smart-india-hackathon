@@ -159,8 +159,9 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
       setTxLogs((prev) => [logEntry, ...prev.slice(0, 15)]);
       useStationStore.getState().recordTelemetryTick();
     } catch (err: any) {
-      console.error("Sensor transmission failed:", err);
-      setTxLogs((prev) => [`[TX ERROR]: Failed to push ${metricName}: ${err.message}`, ...prev.slice(0, 15)]);
+      const errMsg = err?.message || err?.error?.message || (typeof err === "string" ? err : "Sensor transmission error");
+      console.error("Sensor transmission failed:", errMsg, err);
+      setTxLogs((prev) => [`[TX ERROR]: Failed to push ${metricName}: ${errMsg}`, ...prev.slice(0, 15)]);
     } finally {
       setIsTransmitting(false);
     }

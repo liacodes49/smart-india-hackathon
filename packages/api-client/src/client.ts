@@ -99,7 +99,12 @@ export class ApiClient {
           timestamp: new Date().toISOString(),
         };
       }
-      throw error;
+      const errMsg = error.error?.message || `Request failed with status ${response.status}: ${response.statusText}`;
+      const apiErr = new Error(errMsg);
+      (apiErr as any).code = error.error?.code;
+      (apiErr as any).details = error.error?.details;
+      (apiErr as any).apiError = error;
+      throw apiErr;
     }
 
     return (await response.json()) as ApiResponse<T>;
