@@ -327,7 +327,7 @@ async function seed() {
 
   // 5. Seed Sensors
   logger.info('  → Seeding Sensors & Thresholds...');
-  const sensorConfigs = [
+  const sensorConfigs: (typeof sensors.$inferInsert)[] = [
     // MAITRI SENSORS
     {
       assetId: gen1.id,

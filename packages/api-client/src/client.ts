@@ -2,7 +2,7 @@
 // @repo/api-client — Base HTTP Client
 // ═══════════════════════════════════════════════════════════════
 
-import type { ApiResponse, ApiError } from '@repo/shared';
+import type { ApiResponse } from '@repo/shared';
 
 export interface ClientConfig {
   baseUrl: string;
