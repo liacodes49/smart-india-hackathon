@@ -117,16 +117,20 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
       });
   }, [stationId]);
 
-  // Fetch Directives & Work Orders from HQ
+  // Fetch Directives & Work Orders from HQ (also keeps registered sensors in sync)
   const fetchHQDirectives = useCallback(async () => {
     try {
       setLoadingOrders(true);
-      const [woRes, alertsRes] = await Promise.all([
+      const [woRes, alertsRes, sensorsRes] = await Promise.all([
         apiClient.maintenance.list({ stationId, limit: 10 }),
         apiClient.alerts.list({ stationId, limit: 10 }),
+        apiClient.sensors.list({ stationId, limit: 50 }),
       ]);
       setWorkOrders((woRes as any)?.data || []);
       setAlerts((alertsRes as any)?.data || []);
+      if ((sensorsRes as any)?.data && Array.isArray((sensorsRes as any).data)) {
+        setSensors((sensorsRes as any).data);
+      }
     } catch (err) {
       console.warn('Could not fetch HQ directives:', err);
     } finally {
@@ -173,7 +177,8 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
         }
       }
 
-      if (target) {
+      // STRICT SAFETY GUARD: Under no circumstances send a reading if unit does not match target.unit
+      if (target && normalizeUnit(target.unit) === targetUnit) {
         await apiClient.telemetry.ingest({
           sensorId: target.id,
           stationId,
