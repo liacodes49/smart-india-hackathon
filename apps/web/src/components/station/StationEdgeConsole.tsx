@@ -149,7 +149,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
           stationId,
           timestamp: new Date().toISOString(),
           value,
-          unit,
+          unit: target.unit,
           status: value >= (target.criticalThreshold ?? 90) ? "CRITICAL" : value >= (target.warningThreshold ?? 80) ? "WARNING" : "NORMAL",
           quality: 100,
         });
@@ -181,7 +181,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
             stationId,
             timestamp: new Date().toISOString(),
             value: 94.5,
-            unit: "°C",
+            unit: sensor.unit,
             status: "CRITICAL",
             quality: 100,
           });
@@ -199,7 +199,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
             stationId,
             timestamp: new Date().toISOString(),
             value: 0.2,
-            unit: "bar",
+            unit: sensor.unit,
             status: "WARNING",
             quality: 100,
           });
@@ -217,7 +217,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
             stationId,
             timestamp: new Date().toISOString(),
             value: 12.0,
-            unit: "°C",
+            unit: sensor.unit,
             status: "WARNING",
             quality: 100,
           });
