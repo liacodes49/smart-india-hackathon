@@ -161,9 +161,28 @@ export class TelemetryService {
     const expectedUnit = sensor.unit.replace(/[^\w%°C]/g, '').toLowerCase();
     const receivedUnit = input.unit.replace(/[^\w%°C]/g, '').toLowerCase();
     if (expectedUnit && receivedUnit && expectedUnit !== receivedUnit) {
-      throw new Error(
-        `Telemetry unit mismatch: expected '${sensor.unit}', received '${input.unit}'`,
-      );
+      // Self-healing: if the requested sensorId had a different unit (e.g. client sent wrong ID or swapped dropdown),
+      // look up the proper sensor for this station that matches the target unit.
+      let healedSensor: typeof sensor | undefined;
+      try {
+        const stationSensors = await sensorsRepository.findAll({
+          stationId,
+          limit: 100,
+        });
+        healedSensor = stationSensors.data.find(
+          (s) => s.unit.replace(/[^\w%°C]/g, '').toLowerCase() === receivedUnit,
+        );
+      } catch {
+        // Ignored
+      }
+
+      if (healedSensor) {
+        sensor = healedSensor;
+      } else {
+        throw new Error(
+          `Telemetry unit mismatch for sensor '${sensor.name}': expected '${sensor.unit}', received '${input.unit}'`,
+        );
+      }
     }
 
     // 4. Deterministic idempotency duplicate check

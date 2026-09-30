@@ -8,6 +8,7 @@ import { eq, and, sql, lt } from 'drizzle-orm';
 import { db } from '../../config/database.js';
 import { sensors, assets } from '../../db/schema/index.js';
 import type { SensorType, SensorStatus } from '@repo/shared';
+import { resolveStationUuid } from '../../utils/index.js';
 
 export type SensorInsert = typeof sensors.$inferInsert;
 export type SensorSelect = typeof sensors.$inferSelect;
@@ -27,8 +28,9 @@ export class SensorsRepository {
   async findAll(filters?: FindSensorsFilter): Promise<{ data: SensorSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId && UUID_REGEX.test(filters.stationId)) {
-      conditions.push(eq(sensors.stationId, filters.stationId));
+    const resolvedStation = resolveStationUuid(filters?.stationId);
+    if (resolvedStation) {
+      conditions.push(eq(sensors.stationId, resolvedStation));
     }
     if (filters?.assetId && UUID_REGEX.test(filters.assetId)) {
       conditions.push(eq(sensors.assetId, filters.assetId));

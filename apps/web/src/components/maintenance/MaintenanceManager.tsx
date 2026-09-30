@@ -58,9 +58,10 @@ export function MaintenanceManager() {
   const [workOrders, setWorkOrders] = useState<MaintenanceItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'RECOMMENDED' | 'ACTIVE' | 'ALL'>('RECOMMENDED');
+  const [activeTab, setActiveTab] = useState<'RECOMMENDED' | 'ACTIVE' | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Station Assets State for Human-Readable Equipment Display & Selection
   const [stationAssets, setStationAssets] = useState<any[]>([]);
@@ -93,14 +94,16 @@ export function MaintenanceManager() {
 
   const fetchAssets = useCallback(async () => {
     try {
-      const res = await (apiClient as any).client.get('/assets', {
+      const res = await apiClient.assets.list({
         stationId: selectedStation,
         limit: 100,
       });
-      const list = res?.data || [];
+      const list = (res as any)?.data || [];
       if (list.length > 0) {
         setStationAssets(list);
-        setSelectedAssetId(list[0].id);
+        setSelectedAssetId((prev) =>
+          prev && list.some((a: any) => a.id === prev) ? prev : list[0].id,
+        );
         return;
       }
     } catch {}
@@ -201,11 +204,25 @@ export function MaintenanceManager() {
 
   const handleCreateWorkOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newDesc.trim()) return;
+    setFormError(null);
+
+    const title = newTitle.trim();
+    const desc = newDesc.trim();
+
+    if (title.length < 5) {
+      setFormError('Work order title must be at least 5 characters.');
+      return;
+    }
+    if (desc.length < 10) {
+      setFormError('Description must be at least 10 characters.');
+      return;
+    }
 
     const assetId = selectedAssetId || stationAssets[0]?.id;
     if (!assetId) {
-      console.warn('Cannot create work order: No valid asset available for station.');
+      setFormError(
+        'No valid asset found for this station. Please wait for assets to load or select an asset.',
+      );
       return;
     }
 
@@ -215,8 +232,8 @@ export function MaintenanceManager() {
       await apiClient.maintenance.create({
         stationId: selectedStation,
         assetId,
-        title: newTitle,
-        description: newDesc,
+        title,
+        description: desc,
         type: newType,
         priority: newPriority,
         notes: 'Scheduled via NCPOR Operations Console',
@@ -225,10 +242,14 @@ export function MaintenanceManager() {
       setShowCreateModal(false);
       setNewTitle('');
       setNewDesc('');
+      setFormError(null);
+      setActiveTab('ALL'); // ensure created order is visible immediately!
       await fetchWorkOrders();
       useStationStore.getState().recordTelemetryTick();
     } catch (err: any) {
-      console.error('Failed to create work order:', err?.message || err);
+      const msg = err?.message || err?.error?.message || 'Failed to dispatch work order to station';
+      setFormError(msg);
+      console.error('Failed to create work order:', msg, err);
     } finally {
       setActionLoading(null);
     }
@@ -563,6 +584,11 @@ export function MaintenanceManager() {
             </div>
 
             <form onSubmit={handleCreateWorkOrder} className="space-y-4">
+              {formError && (
+                <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-300 text-xs flex items-center gap-2">
+                  <span className="font-bold">Error:</span> {formError}
+                </div>
+              )}
               <div>
                 <label className="block text-[10.5px] font-bold text-slate-400 uppercase mb-1">
                   Target Equipment / Asset

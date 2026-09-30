@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
-import { useStationStore } from "@/stores/useStationStore";
-import { apiClient } from "@/lib/api";
-import { StationId } from "@repo/shared/enums";
-import type { FuelDepletionForecast, EquipmentHealthSummary } from "@repo/shared";
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
+import { useStationStore } from '@/stores/useStationStore';
+import { apiClient } from '@/lib/api';
+import { StationId } from '@repo/shared/enums';
+import type { FuelDepletionForecast, EquipmentHealthSummary } from '@repo/shared';
 import {
   TrendingUp,
   Cpu,
@@ -26,7 +26,7 @@ import {
   ArrowUpRight,
   BarChart3,
   Calendar,
-} from "lucide-react";
+} from 'lucide-react';
 
 export function PredictionsDashboard() {
   const activeStation = useStationStore((s) => s.activeStation);
@@ -45,8 +45,8 @@ export function PredictionsDashboard() {
   // Synchronize with global store
   const handleStationChange = (st: string) => {
     setSelectedStation(st);
-    if (st === "MAITRI") setActiveStation(StationId.MAITRI);
-    else if (st === "BHARATI") setActiveStation(StationId.BHARATI);
+    if (st === 'MAITRI') setActiveStation(StationId.MAITRI);
+    else if (st === 'BHARATI') setActiveStation(StationId.BHARATI);
   };
 
   useEffect(() => {
@@ -59,141 +59,83 @@ export function PredictionsDashboard() {
       setLoading(true);
 
       // 1. Fetch Fuel Forecast
-      const fuelPromise = apiClient.predictions.getFuelDepletion(selectedStation).catch((err) => {
-        console.warn("[Predictions] Fuel forecast load failed:", err);
-        return null;
-      });
+      let fuelData: FuelDepletionForecast | null = null;
+      try {
+        const fuelRes = await apiClient.predictions.getFuelDepletion(selectedStation);
+        if (fuelRes && (fuelRes as any).data) {
+          fuelData = (fuelRes as any).data;
+        }
+      } catch (err: any) {
+        console.error('[Predictions] Fuel forecast load failed:', err);
+      }
+      setFuelForecast(fuelData);
 
       // 2. Fetch Assets for Station
       let assets: any[] = [];
       try {
-        const assetsRes = await (apiClient as any).client.get("/assets", {
+        const assetsRes = await (apiClient as any).client.get('/assets', {
           stationId: selectedStation,
           limit: 20,
         });
         assets = (assetsRes as any)?.data || [];
-      } catch {
-        // Fallback: extract from sensors
-        const sensorsRes = await apiClient.sensors.list({ stationId: selectedStation, limit: 30 });
-        const list = (sensorsRes as any)?.data || [];
-        const seen = new Set<string>();
-        list.forEach((s: any) => {
-          if (s.assetId && !seen.has(s.assetId)) {
-            seen.add(s.assetId);
-            assets.push({
-              id: s.assetId,
-              name: s.asset?.name || s.name?.replace(/Sensor.*/i, "System") || `Equipment ${s.assetId.slice(0, 8)}`,
-              category: s.category || "POWER",
-            });
-          }
-        });
+      } catch (err) {
+        console.warn('[Predictions] Fetch assets failed, falling back to sensors:', err);
+        try {
+          const sensorsRes = await apiClient.sensors.list({
+            stationId: selectedStation,
+            limit: 30,
+          });
+          const list = (sensorsRes as any)?.data || [];
+          const seen = new Set<string>();
+          list.forEach((s: any) => {
+            if (s.assetId && !seen.has(s.assetId)) {
+              seen.add(s.assetId);
+              assets.push({
+                id: s.assetId,
+                name:
+                  s.asset?.name ||
+                  s.name?.replace(/Sensor.*/i, 'System') ||
+                  `Equipment ${s.assetId.slice(0, 8)}`,
+                category: s.category || 'POWER',
+              });
+            }
+          });
+        } catch (sErr) {
+          console.warn('[Predictions] Failed to load fallback sensors:', sErr);
+        }
       }
 
-      // 3. Fetch Equipment Health for Assets
+      // 3. Fetch Equipment Health for Assets from backend engine
       const healthPromises = assets.slice(0, 8).map(async (asset) => {
         try {
           const res = await apiClient.predictions.getEquipmentHealth(asset.id);
           return (res as any)?.data as EquipmentHealthSummary;
-        } catch {
-          // Generate realistic deterministic fallback if not yet evaluated
-          const defaultSummary: EquipmentHealthSummary = {
-            assetId: asset.id,
-            assetName: asset.name,
-            stationId: selectedStation,
-            category: (asset.category as any) || "POWER",
-            healthScore: asset.name?.toLowerCase().includes("generator") ? 78 : 91,
-            anomalyScore: asset.name?.toLowerCase().includes("generator") ? 22 : 6,
-            failureRiskEstimate: asset.name?.toLowerCase().includes("generator") ? ("MEDIUM" as any) : ("LOW" as any),
-            estimatedRul: {
-              estimateHours: asset.name?.toLowerCase().includes("generator") ? 1840 : 4200,
-              minHours: asset.name?.toLowerCase().includes("generator") ? 1400 : 3800,
-              maxHours: asset.name?.toLowerCase().includes("generator") ? 2280 : 4600,
-              confidence: 0.88,
-              degradationTrend: asset.name?.toLowerCase().includes("generator") ? 'DEGRADING' : 'STABLE',
-            },
-            status: "NORMAL" as any,
-            topContributingSignals: [
-              {
-                sensorId: `${asset.id}-temp-01`,
-                sensorName: "Bearing Temperature",
-                sensorType: "TEMPERATURE" as any,
-                currentValue: 74.2,
-                unit: "°C",
-                baseline: 65.0,
-                deviationPercent: 14.1,
-                stressWeight: 0.35,
-              },
-              {
-                sensorId: `${asset.id}-vib-01`,
-                sensorName: "Vibration RMS",
-                sensorType: "VIBRATION" as any,
-                currentValue: 2.1,
-                unit: "mm/s",
-                baseline: 1.8,
-                deviationPercent: 16.6,
-                stressWeight: 0.4,
-              },
-            ],
-            operatingStressFactors: [
-              "Sub-zero ambient intake cycle (-28°C)",
-              "Continuous 24/7 polar microgrid duty",
-            ],
-            assumptions: [
-              "Multi-sensor physical penalty model normalized to 0-100",
-              "Baseline vibration threshold 1.8 mm/s",
-            ],
-            lastEvaluatedAt: new Date().toISOString(),
-          };
-          return defaultSummary;
+        } catch (err) {
+          console.warn(
+            `[Predictions] Real-time health calculation unavailable for ${asset.name} (${asset.id}):`,
+            err,
+          );
+          return null;
         }
       });
 
       // 4. Fetch Prediction Audit Logs
-      const listPromise = apiClient.predictions.list({
-        stationId: selectedStation,
-        limit: 15,
-      }).catch(() => null);
-
-      const [fuelRes, healthResults, listRes] = await Promise.all([
-        fuelPromise,
-        Promise.allSettled(healthPromises),
-        listPromise,
-      ]);
-
-      if (fuelRes && (fuelRes as any).data) {
-        setFuelForecast((fuelRes as any).data);
-      } else {
-        // Fallback realistic fuel forecast
-        setFuelForecast({
+      let auditLogs: any[] = [];
+      try {
+        const listRes = await apiClient.predictions.list({
           stationId: selectedStation,
-          currentStockLiters: selectedStation === "MAITRI" ? 48500 : 62000,
-          dailyBurnRateLiters: 672.0,
-          estimatedDaysRemaining: selectedStation === "MAITRI" ? 72 : 92,
-          estimatedDepletionDate: new Date(Date.now() + 72 * 86400000).toISOString(),
-          daysToMinimumThreshold: 57,
-          thresholdBreachDate: new Date(Date.now() + 57 * 86400000).toISOString(),
-          resupplyFeasible: true,
-          nextResupplyDate: new Date(Date.now() + 45 * 86400000).toISOString(),
-          confidenceScore: 0.92,
-          calculationBasis: "Coupled thermal-load burn rate: 28.0 L/h base + 0.6%/°C sub-zero penalty + electrical load factor",
-          influencingFactors: {
-            electricalLoadKw: 135.0,
-            ambientTempC: -28.4,
-            thermalPenaltyPercent: 17.0,
-            loadBurnFactor: 1.12,
-          },
-          assumptions: [
-            "Baseline generator burn: 28.0 L/h at 120 kW nominal electrical output",
-            "Sub-zero temp adds 0.6% burn per °C below 0°C (viscous fuel drag & HVAC)",
-            "Steady-state operation without catastrophic load shedding",
-          ],
-          forecastedAt: new Date().toISOString(),
+          limit: 15,
         });
+        auditLogs = (listRes as any)?.data || [];
+      } catch (err) {
+        console.warn('[Predictions] Failed to load prediction audit logs:', err);
       }
+      setPredictionsList(auditLogs);
 
+      const healthResults = await Promise.allSettled(healthPromises);
       const validSummaries: EquipmentHealthSummary[] = [];
       healthResults.forEach((r) => {
-        if (r.status === "fulfilled" && r.value) {
+        if (r.status === 'fulfilled' && r.value) {
           validSummaries.push(r.value);
         }
       });
@@ -202,12 +144,8 @@ export function PredictionsDashboard() {
       if (validSummaries.length > 0 && !selectedAssetId) {
         setSelectedAssetId(validSummaries[0].assetId);
       }
-
-      if (listRes && (listRes as any).data) {
-        setPredictionsList((listRes as any).data || []);
-      }
     } catch (err: any) {
-      console.error("[Predictions] Error loading prognostics:", err);
+      console.error('[Predictions] Error loading prognostics:', err);
     } finally {
       setLoading(false);
     }
@@ -223,19 +161,21 @@ export function PredictionsDashboard() {
   const handleTriggerEvaluation = async () => {
     try {
       setEvaluating(true);
-      setActionMessage("Running physics simulation & Bayesian inference models...");
+      setActionMessage('Running physics simulation & Bayesian inference models on backend...');
       await (apiClient.predictions as any).evaluate({
         stationId: selectedStation,
-        type: "FAILURE_PREDICTION",
+        type: 'FAILURE_PREDICTION',
       });
-      setActionMessage("Evaluation complete. Re-aggregating degradation curves...");
+      setActionMessage('Evaluation complete! Re-aggregating degradation curves...');
       await loadPrognosticsData();
-      setActionMessage("Telemetry & prognostics synced successfully.");
+      setActionMessage('Telemetry & prognostics synced successfully with live backend.');
       setTimeout(() => setActionMessage(null), 4000);
     } catch (err: any) {
-      console.error("Evaluation trigger failed:", err);
-      setActionMessage("Evaluation updated locally from real-time telemetry.");
-      setTimeout(() => setActionMessage(null), 3000);
+      console.error('Evaluation trigger failed:', err);
+      setActionMessage(
+        `Evaluation error: ${err?.message || 'Failed to trigger evaluation on backend'}`,
+      );
+      setTimeout(() => setActionMessage(null), 5000);
     } finally {
       setEvaluating(false);
     }
@@ -243,7 +183,9 @@ export function PredictionsDashboard() {
 
   const activeSummary = useMemo(() => {
     if (!selectedAssetId) return equipmentSummaries[0] || null;
-    return equipmentSummaries.find((s) => s.assetId === selectedAssetId) || equipmentSummaries[0] || null;
+    return (
+      equipmentSummaries.find((s) => s.assetId === selectedAssetId) || equipmentSummaries[0] || null
+    );
   }, [selectedAssetId, equipmentSummaries]);
 
   // Overall station equipment reliability score
@@ -255,7 +197,10 @@ export function PredictionsDashboard() {
 
   const atRiskCount = useMemo(() => {
     return equipmentSummaries.filter(
-      (s) => s.failureRiskEstimate === "HIGH" || s.failureRiskEstimate === "CRITICAL" || s.healthScore < 70
+      (s) =>
+        s.failureRiskEstimate === 'HIGH' ||
+        s.failureRiskEstimate === 'CRITICAL' ||
+        s.healthScore < 70,
     ).length;
   }, [equipmentSummaries]);
 
@@ -277,7 +222,8 @@ export function PredictionsDashboard() {
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Deterministic RUL degradation forecasting • Multi-signal anomaly detection • Fuel autonomy models
+              Deterministic RUL degradation forecasting • Multi-signal anomaly detection • Fuel
+              autonomy models
             </p>
           </div>
         </div>
@@ -291,29 +237,31 @@ export function PredictionsDashboard() {
             className="px-3.5 py-1.5 rounded-xl bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/60 text-cyan-200 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(6,182,212,0.25)] transition-all cursor-pointer disabled:opacity-50"
             title="Trigger immediate prognostics evaluation on fresh telemetry"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${evaluating ? "animate-spin" : ""}`} />
-            <span>{evaluating ? "EVALUATING..." : "RE-EVALUATE MODELS"}</span>
+            <RefreshCw
+              className={`w-3.5 h-3.5 text-cyan-400 ${evaluating ? 'animate-spin' : ''}`}
+            />
+            <span>{evaluating ? 'EVALUATING...' : 'RE-EVALUATE MODELS'}</span>
           </button>
 
           <div className="flex items-center p-1 rounded-xl bg-[#040810] border border-white/[0.08]">
             <button
               type="button"
-              onClick={() => handleStationChange("MAITRI")}
+              onClick={() => handleStationChange('MAITRI')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStation === "MAITRI"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  : "text-slate-400 hover:text-slate-200"
+                selectedStation === 'MAITRI'
+                  ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               MAITRI
             </button>
             <button
               type="button"
-              onClick={() => handleStationChange("BHARATI")}
+              onClick={() => handleStationChange('BHARATI')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStation === "BHARATI"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  : "text-slate-400 hover:text-slate-200"
+                selectedStation === 'BHARATI'
+                  ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               BHARATI
@@ -354,14 +302,18 @@ export function PredictionsDashboard() {
               Degradation Warnings
             </span>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className={`text-2xl font-extrabold ${atRiskCount > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+              <span
+                className={`text-2xl font-extrabold ${atRiskCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}
+              >
                 {atRiskCount}
               </span>
               <span className="text-[10px] text-slate-400">Assets &lt; 70% RUL</span>
             </div>
             <span className="text-[10px] text-slate-500">Triggered recommendation</span>
           </div>
-          <AlertTriangle className={`w-7 h-7 ${atRiskCount > 0 ? "text-amber-400" : "text-slate-600"}`} />
+          <AlertTriangle
+            className={`w-7 h-7 ${atRiskCount > 0 ? 'text-amber-400' : 'text-slate-600'}`}
+          />
         </div>
 
         {/* Fuel Autonomy Window */}
@@ -377,7 +329,7 @@ export function PredictionsDashboard() {
               <span className="text-[10px] text-slate-400">to dry tank</span>
             </div>
             <span className="text-[10px] text-emerald-400">
-              Resupply Feasible: {fuelForecast?.resupplyFeasible ? "YES" : "NO"}
+              Resupply Feasible: {fuelForecast?.resupplyFeasible ? 'YES' : 'NO'}
             </span>
           </div>
           <Fuel className="w-7 h-7 text-amber-400" />
@@ -429,8 +381,12 @@ export function PredictionsDashboard() {
               <div className="space-y-3 mt-4">
                 {equipmentSummaries.map((summary) => {
                   const isSelected = selectedAssetId === summary.assetId;
-                  const isCritical = summary.failureRiskEstimate === "CRITICAL" || summary.healthScore < 50;
-                  const isWarning = summary.failureRiskEstimate === "HIGH" || summary.failureRiskEstimate === "MEDIUM" || summary.healthScore < 75;
+                  const isCritical =
+                    summary.failureRiskEstimate === 'CRITICAL' || summary.healthScore < 50;
+                  const isWarning =
+                    summary.failureRiskEstimate === 'HIGH' ||
+                    summary.failureRiskEstimate === 'MEDIUM' ||
+                    summary.healthScore < 75;
 
                   return (
                     <div
@@ -438,12 +394,12 @@ export function PredictionsDashboard() {
                       onClick={() => setSelectedAssetId(summary.assetId)}
                       className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-cyan-950/40 border-cyan-500/70 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                          ? 'bg-cyan-950/40 border-cyan-500/70 shadow-[0_0_15px_rgba(6,182,212,0.2)]'
                           : isCritical
-                          ? "bg-rose-950/20 border-rose-500/40 hover:border-rose-500/70"
-                          : isWarning
-                          ? "bg-amber-950/20 border-amber-500/40 hover:border-amber-500/70"
-                          : "bg-[#040810] border-white/[0.06] hover:border-white/[0.15]"
+                            ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-500/70'
+                            : isWarning
+                              ? 'bg-amber-950/20 border-amber-500/40 hover:border-amber-500/70'
+                              : 'bg-[#040810] border-white/[0.06] hover:border-white/[0.15]'
                       }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -452,10 +408,10 @@ export function PredictionsDashboard() {
                             <span
                               className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
                                 isCritical
-                                  ? "bg-rose-950 text-rose-300 border border-rose-500/50 animate-pulse"
+                                  ? 'bg-rose-950 text-rose-300 border border-rose-500/50 animate-pulse'
                                   : isWarning
-                                  ? "bg-amber-950 text-amber-300 border border-amber-500/50"
-                                  : "bg-emerald-950 text-emerald-300 border border-emerald-500/50"
+                                    ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
+                                    : 'bg-emerald-950 text-emerald-300 border border-emerald-500/50'
                               }`}
                             >
                               {summary.failureRiskEstimate} RISK
@@ -468,7 +424,9 @@ export function PredictionsDashboard() {
 
                           <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
                             <span>{summary.assetName}</span>
-                            {isSelected && <span className="text-cyan-400 text-[10px]">[INSPECTING]</span>}
+                            {isSelected && (
+                              <span className="text-cyan-400 text-[10px]">[INSPECTING]</span>
+                            )}
                           </h3>
 
                           {/* Progress Health Bar */}
@@ -477,10 +435,10 @@ export function PredictionsDashboard() {
                               <div
                                 className={`h-full rounded-full transition-all duration-500 ${
                                   summary.healthScore > 80
-                                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
                                     : summary.healthScore > 50
-                                    ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-                                    : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
+                                      ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                                      : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
                                 }`}
                                 style={{ width: `${Math.max(5, summary.healthScore)}%` }}
                               />
@@ -497,10 +455,11 @@ export function PredictionsDashboard() {
                             Est. Useful Life (RUL)
                           </span>
                           <span className="text-base font-extrabold text-cyan-300">
-                            ~{summary.estimatedRul?.estimateHours?.toLocaleString() ?? "2,400"} hrs
+                            ~{summary.estimatedRul?.estimateHours?.toLocaleString() ?? '2,400'} hrs
                           </span>
                           <span className="text-[9.5px] text-slate-500">
-                            Range: {summary.estimatedRul?.minHours ?? 1800}–{summary.estimatedRul?.maxHours ?? 3000}h
+                            Range: {summary.estimatedRul?.minHours ?? 1800}–
+                            {summary.estimatedRul?.maxHours ?? 3000}h
                           </span>
                         </div>
                       </div>
@@ -545,7 +504,11 @@ export function PredictionsDashboard() {
                         <div className="space-y-0.5">
                           <span className="font-bold text-slate-200">{sig.sensorName}</span>
                           <div className="text-[10px] text-slate-400">
-                            Observed: <span className="text-cyan-300 font-semibold">{sig.currentValue} {sig.unit}</span> • Baseline: {sig.baseline} {sig.unit}
+                            Observed:{' '}
+                            <span className="text-cyan-300 font-semibold">
+                              {sig.currentValue} {sig.unit}
+                            </span>{' '}
+                            • Baseline: {sig.baseline} {sig.unit}
                           </div>
                         </div>
 
@@ -553,13 +516,15 @@ export function PredictionsDashboard() {
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
                               Math.abs(sig.deviationPercent) > 20
-                                ? "bg-rose-950 text-rose-300 border border-rose-500/50"
+                                ? 'bg-rose-950 text-rose-300 border border-rose-500/50'
                                 : Math.abs(sig.deviationPercent) > 10
-                                ? "bg-amber-950 text-amber-300 border border-amber-500/50"
-                                : "bg-emerald-950 text-emerald-300 border border-emerald-500/50"
+                                  ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
+                                  : 'bg-emerald-950 text-emerald-300 border border-emerald-500/50'
                             }`}
                           >
-                            {sig.deviationPercent > 0 ? `+${sig.deviationPercent}%` : `${sig.deviationPercent}%`}
+                            {sig.deviationPercent > 0
+                              ? `+${sig.deviationPercent}%`
+                              : `${sig.deviationPercent}%`}
                           </span>
                         </div>
                       </div>
@@ -585,10 +550,11 @@ export function PredictionsDashboard() {
                 {/* Dispatch Maintenance Quick Link */}
                 <div className="pt-2 border-t border-white/[0.08] flex items-center justify-between gap-3">
                   <div className="text-[10.5px] text-slate-400">
-                    Prognostics indicate maintenance window within{" "}
+                    Prognostics indicate maintenance window within{' '}
                     <span className="text-amber-300 font-bold">
                       {Math.round((activeSummary.estimatedRul?.estimateHours || 1200) / 24)} days
-                    </span>.
+                    </span>
+                    .
                   </div>
                   <Link
                     href={`/maintenance?assetId=${activeSummary.assetId}`}
@@ -628,7 +594,9 @@ export function PredictionsDashboard() {
 
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="p-2.5 rounded-xl bg-[#040810] border border-white/[0.06]">
-                  <span className="text-[10px] text-slate-500 uppercase block">Current POL Stock</span>
+                  <span className="text-[10px] text-slate-500 uppercase block">
+                    Current POL Stock
+                  </span>
                   <span className="text-base font-extrabold text-amber-300">
                     {fuelForecast.currentStockLiters.toLocaleString()} L
                   </span>
@@ -638,7 +606,9 @@ export function PredictionsDashboard() {
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-[#040810] border border-white/[0.06]">
-                  <span className="text-[10px] text-slate-500 uppercase block">Days to Reserve Minimum</span>
+                  <span className="text-[10px] text-slate-500 uppercase block">
+                    Days to Reserve Minimum
+                  </span>
                   <span className="text-base font-extrabold text-cyan-300">
                     {fuelForecast.daysToMinimumThreshold} Days
                   </span>
@@ -659,7 +629,9 @@ export function PredictionsDashboard() {
                 <div className="w-full h-2.5 rounded-full bg-slate-900 border border-white/[0.08] overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full"
-                    style={{ width: `${Math.min(100, Math.max(10, (fuelForecast.currentStockLiters / 80000) * 100))}%` }}
+                    style={{
+                      width: `${Math.min(100, Math.max(10, (fuelForecast.currentStockLiters / 80000) * 100))}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -688,7 +660,8 @@ export function PredictionsDashboard() {
 
         {predictionsList.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-500">
-            No historical prediction events logged yet. Trigger re-evaluation above to log forecasts.
+            No historical prediction events logged yet. Trigger re-evaluation above to log
+            forecasts.
           </div>
         ) : (
           <div className="divide-y divide-white/[0.06] mt-3">
@@ -750,15 +723,21 @@ export function PredictionsDashboard() {
               <div className="p-3 rounded-xl bg-[#040810] border border-white/[0.08] space-y-1 text-[11px]">
                 <div className="flex justify-between text-slate-400">
                   <span>Electrical Load:</span>
-                  <span className="text-slate-200 font-bold">{fuelForecast.influencingFactors?.electricalLoadKw} kW</span>
+                  <span className="text-slate-200 font-bold">
+                    {fuelForecast.influencingFactors?.electricalLoadKw} kW
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Ambient Meteorological Temp:</span>
-                  <span className="text-slate-200 font-bold">{fuelForecast.influencingFactors?.ambientTempC}°C</span>
+                  <span className="text-slate-200 font-bold">
+                    {fuelForecast.influencingFactors?.ambientTempC}°C
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Thermal Penalty Addition:</span>
-                  <span className="text-amber-400 font-bold">+{fuelForecast.influencingFactors?.thermalPenaltyPercent}%</span>
+                  <span className="text-amber-400 font-bold">
+                    +{fuelForecast.influencingFactors?.thermalPenaltyPercent}%
+                  </span>
                 </div>
               </div>
             </div>

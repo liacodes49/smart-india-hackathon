@@ -21,7 +21,10 @@ export const createAssetSchema = z.object({
   model: z.string().max(255).optional().nullable(),
   serialNumber: z.string().max(255).optional().nullable(),
   installDate: z.string().datetime().optional().nullable(),
-  status: z.enum(['NORMAL', 'WARNING', 'CRITICAL', 'OFFLINE', 'MAINTENANCE']).optional().default('NORMAL'),
+  status: z
+    .enum(['NORMAL', 'WARNING', 'CRITICAL', 'OFFLINE', 'MAINTENANCE'])
+    .optional()
+    .default('NORMAL'),
   criticality: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional().default('MEDIUM'),
   metadata: z.record(z.unknown()).optional().nullable(),
 });
@@ -32,20 +35,22 @@ export const updateAssetSchema = createAssetSchema.partial();
 export type UpdateAssetInput = z.infer<typeof updateAssetSchema>;
 
 export const assetQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
   buildingId: z.string().uuid().optional(),
   roomId: z.string().uuid().optional(),
-  category: z.enum([
-    'GENERATOR',
-    'HVAC',
-    'COMMUNICATION',
-    'WATER_TREATMENT',
-    'FIRE_SAFETY',
-    'RESEARCH_EQUIPMENT',
-    'VEHICLE',
-    'STORAGE',
-    'STRUCTURAL',
-  ]).optional(),
+  category: z
+    .enum([
+      'GENERATOR',
+      'HVAC',
+      'COMMUNICATION',
+      'WATER_TREATMENT',
+      'FIRE_SAFETY',
+      'RESEARCH_EQUIPMENT',
+      'VEHICLE',
+      'STORAGE',
+      'STRUCTURAL',
+    ])
+    .optional(),
   criticality: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
   status: z.enum(['NORMAL', 'WARNING', 'CRITICAL', 'OFFLINE', 'MAINTENANCE']).optional(),
   page: z.coerce.number().int().min(1).default(1),

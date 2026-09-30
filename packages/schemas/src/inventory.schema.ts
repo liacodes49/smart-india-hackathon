@@ -29,9 +29,12 @@ export const consumeResourceSchema = z.object({
 export type ConsumeResourceInput = z.infer<typeof consumeResourceSchema>;
 
 export const inventoryQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
   category: z.enum(['FUEL', 'FOOD', 'WATER', 'MEDICAL', 'SPARE_PARTS', 'CONSUMABLES']).optional(),
-  lowStockOnly: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
+  lowStockOnly: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });

@@ -8,6 +8,7 @@ import { eq, and, sql, desc, ne } from 'drizzle-orm';
 import { db } from '../../config/database.js';
 import { incidents } from '../../db/schema/index.js';
 import type { IncidentSeverity, IncidentStatus } from '@repo/shared';
+import { resolveStationUuid } from '../../utils/index.js';
 
 export type IncidentInsert = typeof incidents.$inferInsert;
 export type IncidentSelect = typeof incidents.$inferSelect;
@@ -46,8 +47,9 @@ export class IncidentsRepository {
   async findAll(filter?: FindIncidentsFilter): Promise<{ data: IncidentSelect[]; total: number }> {
     const conditions = [];
 
-    if (filter?.stationId) {
-      conditions.push(eq(incidents.stationId, filter.stationId));
+    const resolvedStation = resolveStationUuid(filter?.stationId);
+    if (resolvedStation) {
+      conditions.push(eq(incidents.stationId, resolvedStation));
     }
     if (filter?.severity) {
       conditions.push(eq(incidents.severity, filter.severity as any));

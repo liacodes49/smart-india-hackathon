@@ -20,23 +20,37 @@ export interface FindPredictionsFilter {
   limit?: number;
 }
 
+function resolveStationId(id: string | undefined): string | undefined {
+  if (!id) return undefined;
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  if (isUuid) return id;
+  const upper = id.toUpperCase();
+  if (upper === 'MAITRI') return '00000000-0000-0000-0000-000000000001';
+  if (upper === 'BHARATI') return '00000000-0000-0000-0000-000000000002';
+  return id;
+}
+
 export class PredictionsRepository {
   async create(data: PredictionInsert): Promise<PredictionSelect> {
-    const [record] = await db.insert(predictions).values(data).returning();
+    const stationId = resolveStationId(data.stationId) ?? data.stationId;
+    const [record] = await db
+      .insert(predictions)
+      .values({ ...data, stationId })
+      .returning();
     return record!;
   }
 
   async createMany(data: PredictionInsert[]): Promise<PredictionSelect[]> {
     if (data.length === 0) return [];
-    return db.insert(predictions).values(data).returning();
+    const sanitized = data.map((d) => ({
+      ...d,
+      stationId: resolveStationId(d.stationId) ?? d.stationId,
+    }));
+    return db.insert(predictions).values(sanitized).returning();
   }
 
   async findById(id: string): Promise<PredictionSelect | null> {
-    const [record] = await db
-      .select()
-      .from(predictions)
-      .where(eq(predictions.id, id))
-      .limit(1);
+    const [record] = await db.select().from(predictions).where(eq(predictions.id, id)).limit(1);
 
     return record ?? null;
   }
@@ -52,11 +66,9 @@ export class PredictionsRepository {
     return record ?? null;
   }
 
-  async findLatestByStation(
-    stationId: string,
-    type?: PredictionType
-  ): Promise<PredictionSelect[]> {
-    const conditions = [eq(predictions.stationId, stationId)];
+  async findLatestByStation(stationId: string, type?: PredictionType): Promise<PredictionSelect[]> {
+    const resolvedStation = resolveStationId(stationId) ?? stationId;
+    const conditions = [eq(predictions.stationId, resolvedStation)];
     if (type) {
       conditions.push(eq(predictions.type, type));
     }
@@ -70,12 +82,15 @@ export class PredictionsRepository {
   }
 
   async findAll(
-    filters?: FindPredictionsFilter
+    filters?: FindPredictionsFilter,
   ): Promise<{ data: PredictionSelect[]; total: number }> {
     const conditions = [];
 
     if (filters?.stationId) {
-      conditions.push(eq(predictions.stationId, filters.stationId));
+      const resolvedStation = resolveStationId(filters.stationId);
+      if (resolvedStation) {
+        conditions.push(eq(predictions.stationId, resolvedStation));
+      }
     }
     if (filters?.sensorId) {
       conditions.push(eq(predictions.sensorId, filters.sensorId));

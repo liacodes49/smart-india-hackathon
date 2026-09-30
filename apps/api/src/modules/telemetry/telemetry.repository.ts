@@ -9,6 +9,7 @@ import { eq, and, sql, gte, lte, desc, asc } from 'drizzle-orm';
 import { db } from '../../config/database.js';
 import { telemetry, sensors } from '../../db/schema/index.js';
 import type { SensorStatus } from '@repo/shared';
+import { resolveStationUuid } from '../../utils/index.js';
 
 export type TelemetryInsert = typeof telemetry.$inferInsert;
 export type TelemetrySelect = typeof telemetry.$inferSelect;
@@ -84,8 +85,9 @@ export class TelemetryRepository {
   ): Promise<{ data: TelemetrySelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId && UUID_REGEX.test(filters.stationId)) {
-      conditions.push(eq(telemetry.stationId, filters.stationId));
+    const resolvedStation = resolveStationUuid(filters?.stationId);
+    if (resolvedStation) {
+      conditions.push(eq(telemetry.stationId, resolvedStation));
     }
     if (filters?.sensorId && UUID_REGEX.test(filters.sensorId)) {
       conditions.push(eq(telemetry.sensorId, filters.sensorId));

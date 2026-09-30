@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useCallback } from "react";
-import { apiClient } from "@/lib/api";
-import { useStationStore } from "@/stores/useStationStore";
-import { StationId } from "@repo/shared/enums";
+import React, { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
+import { useStationStore } from '@/stores/useStationStore';
+import { StationId } from '@repo/shared/enums';
 import {
   Radio,
   Zap,
@@ -20,7 +20,7 @@ import {
   Database,
   ArrowUpRight,
   ShieldAlert,
-} from "lucide-react";
+} from 'lucide-react';
 
 interface Sensor {
   id: string;
@@ -42,16 +42,19 @@ export function TelemetryControlCenter() {
   const activeStation = useStationStore((s) => s.activeStation);
   const setActiveStation = useStationStore((s) => s.setActiveStation);
 
-  const [selectedStation, setSelectedStation] = useState<string>(activeStation || "MAITRI");
+  const [selectedStation, setSelectedStation] = useState<string>(activeStation || 'MAITRI');
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [transmitting, setTransmitting] = useState<boolean>(false);
   const [packetCount, setPacketCount] = useState<number>(1420);
-  const [selectedSensorId, setSelectedSensorId] = useState<string>("");
+  const [selectedSensorId, setSelectedSensorId] = useState<string>('');
   const [customValue, setCustomValue] = useState<number>(85);
-  const [customStatus, setCustomStatus] = useState<string>("NORMAL");
-  const [filterType, setFilterType] = useState<string>("ALL");
-  const [message, setMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
+  const [customStatus, setCustomStatus] = useState<string>('NORMAL');
+  const [filterType, setFilterType] = useState<string>('ALL');
+  const [message, setMessage] = useState<{
+    text: string;
+    type: 'success' | 'error' | 'info';
+  } | null>(null);
 
   // Fetch sensors for active station
   const fetchSensors = useCallback(async () => {
@@ -65,7 +68,7 @@ export function TelemetryControlCenter() {
         setCustomValue(sensorData[0].lastReading ?? 50);
       }
     } catch (err: any) {
-      console.error("[TelemetryControlCenter] Error fetching sensors:", err);
+      console.error('[TelemetryControlCenter] Error fetching sensors:', err);
     } finally {
       setLoading(false);
     }
@@ -82,8 +85,8 @@ export function TelemetryControlCenter() {
 
   const handleStationChange = (station: string) => {
     setSelectedStation(station);
-    if (station === "MAITRI") setActiveStation(StationId.MAITRI);
-    else if (station === "BHARATI") setActiveStation(StationId.BHARATI);
+    if (station === 'MAITRI') setActiveStation(StationId.MAITRI);
+    else if (station === 'BHARATI') setActiveStation(StationId.BHARATI);
   };
 
   // Ingest manual custom sensor reading
@@ -108,14 +111,14 @@ export function TelemetryControlCenter() {
 
       setMessage({
         text: `Transmitted ${sensor.name} = ${customValue} ${sensor.unit} to NCPOR HQ Twin in India!`,
-        type: "success",
+        type: 'success',
       });
       setPacketCount((p) => p + 1);
       fetchSensors();
     } catch (err: any) {
       setMessage({
-        text: err?.message || "Failed to transmit telemetry payload",
-        type: "error",
+        text: err?.message || 'Failed to transmit telemetry payload',
+        type: 'error',
       });
     } finally {
       setTransmitting(false);
@@ -123,39 +126,65 @@ export function TelemetryControlCenter() {
   };
 
   // Trigger Antarctic Emergency Scenario
-  const handleTriggerScenario = async (scenario: "OVERHEAT" | "BLIZZARD" | "FREEZE" | "NORMAL") => {
+  const handleTriggerScenario = async (scenario: 'OVERHEAT' | 'BLIZZARD' | 'FREEZE' | 'NORMAL') => {
     try {
       setTransmitting(true);
       setMessage(null);
 
-      if (scenario === "OVERHEAT") {
-        const coolantGen = sensors.find((s) => s.name.toLowerCase().includes("coolant")) || sensors[0];
-        if (coolantGen) {
-          await apiClient.telemetry.ingest({
-            sensorId: coolantGen.id,
-            stationId: coolantGen.stationId,
-            timestamp: new Date().toISOString(),
-            value: 96.5,
-            unit: coolantGen.unit,
-            status: "CRITICAL",
-            quality: 100,
-          });
+      if (scenario === 'OVERHEAT') {
+        const coolantGen = sensors.find(
+          (s) =>
+            s.name.toLowerCase().includes('coolant') ||
+            (s.type === 'TEMPERATURE' &&
+              (s.name.toLowerCase().includes('gen') || s.name.toLowerCase().includes('engine'))) ||
+            (s.type === 'TEMPERATURE' && s.unit.includes('°C')),
+        );
+        if (!coolantGen) {
+          throw new Error('No coolant/temperature sensor found for this station');
         }
-        setMessage({
-          text: "🚨 EXECUTED: Generator Overheat Scenario (96.5°C) transmitted to HQ Twin!",
-          type: "error",
+        await apiClient.telemetry.ingest({
+          sensorId: coolantGen.id,
+          stationId: coolantGen.stationId,
+          timestamp: new Date().toISOString(),
+          value: 96.5,
+          unit: coolantGen.unit,
+          status: 'CRITICAL',
+          quality: 100,
         });
-      } else if (scenario === "BLIZZARD") {
-        const windSensor = sensors.find((s) => s.type === "WIND_SPEED") || sensors[0];
-        const tempSensor = sensors.find((s) => s.name.toLowerCase().includes("outside")) || sensors[0];
+        setMessage({
+          text: `🚨 EXECUTED: Generator Overheat Scenario (96.5${coolantGen.unit}) transmitted to HQ Twin via ${coolantGen.name}!`,
+          type: 'error',
+        });
+      } else if (scenario === 'BLIZZARD') {
+        const windSensor = sensors.find(
+          (s) =>
+            s.type === 'WIND_SPEED' ||
+            s.name.toLowerCase().includes('wind') ||
+            s.unit.toLowerCase().includes('km/h') ||
+            s.unit.toLowerCase().includes('m/s') ||
+            s.unit.toLowerCase().includes('knot'),
+        );
+        const tempSensor =
+          sensors.find(
+            (s) =>
+              (s.type === 'TEMPERATURE' || s.unit.includes('°C')) &&
+              (s.name.toLowerCase().includes('outside') ||
+                s.name.toLowerCase().includes('ambient') ||
+                s.name.toLowerCase().includes('weather')),
+          ) || sensors.find((s) => s.type === 'TEMPERATURE');
+
+        if (!windSensor && !tempSensor) {
+          throw new Error('No meteorological or temperature sensor found for this station');
+        }
+
         if (windSensor) {
           await apiClient.telemetry.ingest({
             sensorId: windSensor.id,
             stationId: windSensor.stationId,
             timestamp: new Date().toISOString(),
-            value: 165.4,
+            value: windSensor.criticalThreshold ? windSensor.criticalThreshold + 15 : 165.4,
             unit: windSensor.unit,
-            status: "CRITICAL",
+            status: 'CRITICAL',
             quality: 100,
           });
         }
@@ -166,32 +195,40 @@ export function TelemetryControlCenter() {
             timestamp: new Date().toISOString(),
             value: -58.2,
             unit: tempSensor.unit,
-            status: "CRITICAL",
+            status: 'CRITICAL',
             quality: 100,
           });
         }
         setMessage({
-          text: "❄️ EXECUTED: Katabatic Blizzard Scenario (165 km/h, -58°C) transmitted to HQ Twin!",
-          type: "error",
+          text: '❄️ EXECUTED: Katabatic Blizzard Scenario transmitted to HQ Twin!',
+          type: 'error',
         });
-      } else if (scenario === "FREEZE") {
-        const flowSensor = sensors.find((s) => s.type === "WATER") || sensors[0];
-        if (flowSensor) {
-          await apiClient.telemetry.ingest({
-            sensorId: flowSensor.id,
-            stationId: flowSensor.stationId,
-            timestamp: new Date().toISOString(),
-            value: 2.1,
-            unit: flowSensor.unit,
-            status: "CRITICAL",
-            quality: 100,
-          });
+      } else if (scenario === 'FREEZE') {
+        const flowSensor = sensors.find(
+          (s) =>
+            s.type === 'WATER' ||
+            s.type === 'PRESSURE' ||
+            s.name.toLowerCase().includes('water') ||
+            s.name.toLowerCase().includes('pump') ||
+            s.name.toLowerCase().includes('flow'),
+        );
+        if (!flowSensor) {
+          throw new Error('No water/pressure sensor found for this station');
         }
-        setMessage({
-          text: "💧 EXECUTED: Intake Water Freeze Scenario (2.1 L/min) transmitted to HQ Twin!",
-          type: "error",
+        await apiClient.telemetry.ingest({
+          sensorId: flowSensor.id,
+          stationId: flowSensor.stationId,
+          timestamp: new Date().toISOString(),
+          value: 2.1,
+          unit: flowSensor.unit,
+          status: 'CRITICAL',
+          quality: 100,
         });
-      } else if (scenario === "NORMAL") {
+        setMessage({
+          text: `💧 EXECUTED: Intake Water Freeze Scenario (2.1 ${flowSensor.unit}) transmitted to HQ Twin via ${flowSensor.name}!`,
+          type: 'error',
+        });
+      } else if (scenario === 'NORMAL') {
         for (const s of sensors) {
           const normalVal = s.warningThreshold ? (s.minThreshold ?? 0) + 10 : 50;
           await apiClient.telemetry.ingest({
@@ -200,20 +237,20 @@ export function TelemetryControlCenter() {
             timestamp: new Date().toISOString(),
             value: normalVal,
             unit: s.unit,
-            status: "NORMAL",
+            status: 'NORMAL',
             quality: 100,
           });
         }
         setMessage({
-          text: "🟢 RESTORED: Safe Antarctic baseline operational state transmitted to HQ Twin!",
-          type: "info",
+          text: '🟢 RESTORED: Safe Antarctic baseline operational state transmitted to HQ Twin!',
+          type: 'info',
         });
       }
 
       setPacketCount((p) => p + 5);
       fetchSensors();
     } catch (err: any) {
-      setMessage({ text: err?.message || "Scenario injection failed", type: "error" });
+      setMessage({ text: err?.message || 'Scenario injection failed', type: 'error' });
     } finally {
       setTransmitting(false);
     }
@@ -222,7 +259,7 @@ export function TelemetryControlCenter() {
   const selectedSensor = sensors.find((s) => s.id === selectedSensorId);
 
   const filteredSensors = sensors.filter((s) => {
-    if (filterType === "ALL") return true;
+    if (filterType === 'ALL') return true;
     return s.type === filterType;
   });
 
@@ -247,7 +284,6 @@ export function TelemetryControlCenter() {
             <p className="text-[11px] text-slate-400">
               Station Edge Node Transmitter → Real-time Satellite Sync to NCPOR HQ (Goa, India)
             </p>
-
           </div>
         </div>
 
@@ -269,22 +305,22 @@ export function TelemetryControlCenter() {
           <div className="flex items-center p-1 rounded-xl bg-[#040810] border border-white/[0.08]">
             <button
               type="button"
-              onClick={() => handleStationChange("MAITRI")}
+              onClick={() => handleStationChange('MAITRI')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStation === "MAITRI"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  : "text-slate-400 hover:text-slate-200"
+                selectedStation === 'MAITRI'
+                  ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               MAITRI (70°S)
             </button>
             <button
               type="button"
-              onClick={() => handleStationChange("BHARATI")}
+              onClick={() => handleStationChange('BHARATI')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedStation === "BHARATI"
-                  ? "bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  : "text-slate-400 hover:text-slate-200"
+                selectedStation === 'BHARATI'
+                  ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/60 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               BHARATI (69°S)
@@ -297,17 +333,17 @@ export function TelemetryControlCenter() {
       {message && (
         <div
           className={`p-3 rounded-xl border flex items-center justify-between text-xs font-semibold ${
-            message.type === "success"
-              ? "bg-emerald-950/80 border-emerald-500/50 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-              : message.type === "error"
-              ? "bg-rose-950/80 border-rose-500/50 text-rose-200 shadow-[0_0_15px_rgba(244,63,94,0.2)]"
-              : "bg-cyan-950/80 border-cyan-500/50 text-cyan-200"
+            message.type === 'success'
+              ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+              : message.type === 'error'
+                ? 'bg-rose-950/80 border-rose-500/50 text-rose-200 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
+                : 'bg-cyan-950/80 border-cyan-500/50 text-cyan-200'
           }`}
         >
           <div className="flex items-center gap-2">
-            {message.type === "success" ? (
+            {message.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            ) : message.type === "error" ? (
+            ) : message.type === 'error' ? (
               <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
             ) : (
               <Activity className="w-4 h-4 text-cyan-400 shrink-0" />
@@ -359,7 +395,7 @@ export function TelemetryControlCenter() {
                   >
                     {sensors.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} ({s.unit}) — Current: {s.lastReading ?? "N/A"}
+                        {s.name} ({s.unit}) — Current: {s.lastReading ?? 'N/A'}
                       </option>
                     ))}
                   </select>
@@ -391,9 +427,7 @@ export function TelemetryControlCenter() {
                       Inject Reading Value for {selectedSensor.name}:
                     </span>
                     <div className="flex items-center gap-1.5 font-mono">
-                      <span className="text-base font-extrabold text-cyan-400">
-                        {customValue}
-                      </span>
+                      <span className="text-base font-extrabold text-cyan-400">{customValue}</span>
                       <span className="text-xs text-slate-400">{selectedSensor.unit}</span>
                     </div>
                   </div>
@@ -402,17 +436,25 @@ export function TelemetryControlCenter() {
                     type="range"
                     min={selectedSensor.minThreshold ?? -80}
                     max={selectedSensor.maxThreshold ?? 350}
-                    step={selectedSensor.unit === "°C" || selectedSensor.unit === "%" ? 0.5 : 1}
+                    step={selectedSensor.unit === '°C' || selectedSensor.unit === '%' ? 0.5 : 1}
                     value={customValue}
                     onChange={(e) => setCustomValue(Number(e.target.value))}
                     className="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg"
                   />
 
                   <div className="flex items-center justify-between text-[10px] text-slate-500">
-                    <span>Min: {selectedSensor.minThreshold ?? -80} {selectedSensor.unit}</span>
-                    <span>Warning: {selectedSensor.warningThreshold ?? "N/A"} {selectedSensor.unit}</span>
-                    <span>Critical: {selectedSensor.criticalThreshold ?? "N/A"} {selectedSensor.unit}</span>
-                    <span>Max: {selectedSensor.maxThreshold ?? 350} {selectedSensor.unit}</span>
+                    <span>
+                      Min: {selectedSensor.minThreshold ?? -80} {selectedSensor.unit}
+                    </span>
+                    <span>
+                      Warning: {selectedSensor.warningThreshold ?? 'N/A'} {selectedSensor.unit}
+                    </span>
+                    <span>
+                      Critical: {selectedSensor.criticalThreshold ?? 'N/A'} {selectedSensor.unit}
+                    </span>
+                    <span>
+                      Max: {selectedSensor.maxThreshold ?? 350} {selectedSensor.unit}
+                    </span>
                   </div>
                 </div>
               )}
@@ -445,14 +487,15 @@ export function TelemetryControlCenter() {
             </div>
 
             <p className="text-[10.5px] text-slate-400 mb-4 leading-relaxed">
-              One-touch emergency triggers for live multi-laptop demonstration. Watch the 3D Twin on Laptop 3 react instantly!
+              One-touch emergency triggers for live multi-laptop demonstration. Watch the 3D Twin on
+              Laptop 3 react instantly!
             </p>
 
             <div className="space-y-3">
               {/* Trigger 1: Generator Overheat */}
               <button
                 type="button"
-                onClick={() => handleTriggerScenario("OVERHEAT")}
+                onClick={() => handleTriggerScenario('OVERHEAT')}
                 disabled={transmitting}
                 className="w-full p-3 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 border border-rose-500/40 text-left transition-all cursor-pointer flex items-center justify-between group"
               >
@@ -475,7 +518,7 @@ export function TelemetryControlCenter() {
               {/* Trigger 2: Katabatic Blizzard */}
               <button
                 type="button"
-                onClick={() => handleTriggerScenario("BLIZZARD")}
+                onClick={() => handleTriggerScenario('BLIZZARD')}
                 disabled={transmitting}
                 className="w-full p-3 rounded-xl bg-sky-950/50 hover:bg-sky-900/60 border border-sky-500/40 text-left transition-all cursor-pointer flex items-center justify-between group"
               >
@@ -498,7 +541,7 @@ export function TelemetryControlCenter() {
               {/* Trigger 3: Lake Intake Freeze */}
               <button
                 type="button"
-                onClick={() => handleTriggerScenario("FREEZE")}
+                onClick={() => handleTriggerScenario('FREEZE')}
                 disabled={transmitting}
                 className="w-full p-3 rounded-xl bg-indigo-950/50 hover:bg-indigo-900/60 border border-indigo-500/40 text-left transition-all cursor-pointer flex items-center justify-between group"
               >
@@ -521,7 +564,7 @@ export function TelemetryControlCenter() {
               {/* Trigger 4: Normal Baseline */}
               <button
                 type="button"
-                onClick={() => handleTriggerScenario("NORMAL")}
+                onClick={() => handleTriggerScenario('NORMAL')}
                 disabled={transmitting}
                 className="w-full p-3 rounded-xl bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/40 text-left transition-all cursor-pointer flex items-center justify-between group"
               >
@@ -557,20 +600,22 @@ export function TelemetryControlCenter() {
 
           {/* Type Filter Buttons */}
           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-            {["ALL", "TEMPERATURE", "POWER", "FUEL", "WIND_SPEED", "WATER", "PRESSURE"].map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setFilterType(type)}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                  filterType === type
-                    ? "bg-cyan-950 text-cyan-200 border border-cyan-500/50"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-                }`}
-              >
-                {type}
-              </button>
-            ))}
+            {['ALL', 'TEMPERATURE', 'POWER', 'FUEL', 'WIND_SPEED', 'WATER', 'PRESSURE'].map(
+              (type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setFilterType(type)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    filterType === type
+                      ? 'bg-cyan-950 text-cyan-200 border border-cyan-500/50'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                  }`}
+                >
+                  {type}
+                </button>
+              ),
+            )}
           </div>
         </div>
 
@@ -588,8 +633,8 @@ export function TelemetryControlCenter() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
             {filteredSensors.map((sensor) => {
               const val = sensor.lastReading ?? 0;
-              const isWarning = sensor.status === "WARNING";
-              const isCritical = sensor.status === "CRITICAL";
+              const isWarning = sensor.status === 'WARNING';
+              const isCritical = sensor.status === 'CRITICAL';
 
               return (
                 <div
@@ -600,25 +645,28 @@ export function TelemetryControlCenter() {
                   }}
                   className={`p-3.5 rounded-xl border transition-all cursor-pointer hover:border-cyan-500/60 ${
                     selectedSensorId === sensor.id
-                      ? "bg-cyan-950/40 border-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.2)]"
+                      ? 'bg-cyan-950/40 border-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                       : isCritical
-                      ? "bg-rose-950/30 border-rose-500/40"
-                      : isWarning
-                      ? "bg-amber-950/30 border-amber-500/40"
-                      : "bg-[#040810] border-white/[0.06]"
+                        ? 'bg-rose-950/30 border-rose-500/40'
+                        : isWarning
+                          ? 'bg-amber-950/30 border-amber-500/40'
+                          : 'bg-[#040810] border-white/[0.06]'
                   }`}
                 >
                   <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.04]">
-                    <span className="text-xs font-bold text-slate-200 truncate max-w-[170px]" title={sensor.name}>
+                    <span
+                      className="text-xs font-bold text-slate-200 truncate max-w-[170px]"
+                      title={sensor.name}
+                    >
                       {sensor.name}
                     </span>
                     <span
                       className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold ${
                         isCritical
-                          ? "bg-rose-950 text-rose-300 border border-rose-500/50"
+                          ? 'bg-rose-950 text-rose-300 border border-rose-500/50'
                           : isWarning
-                          ? "bg-amber-950 text-amber-300 border border-amber-500/50"
-                          : "bg-emerald-950 text-emerald-300 border border-emerald-500/50"
+                            ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
+                            : 'bg-emerald-950 text-emerald-300 border border-emerald-500/50'
                       }`}
                     >
                       {sensor.status}
@@ -634,8 +682,8 @@ export function TelemetryControlCenter() {
                   </div>
 
                   <div className="flex items-center justify-between text-[9px] text-slate-500 mt-2">
-                    <span>Min: {sensor.minThreshold ?? "N/A"}</span>
-                    <span>Max: {sensor.maxThreshold ?? "N/A"}</span>
+                    <span>Min: {sensor.minThreshold ?? 'N/A'}</span>
+                    <span>Max: {sensor.maxThreshold ?? 'N/A'}</span>
                   </div>
                 </div>
               );

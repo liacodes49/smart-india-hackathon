@@ -8,6 +8,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../config/database.js';
 import { assets, buildings, rooms, stations } from '../../db/schema/index.js';
 import type { AssetCategory, AssetCriticality, SensorStatus } from '@repo/shared';
+import { resolveStationUuid } from '../../utils/index.js';
 
 export type AssetInsert = typeof assets.$inferInsert;
 export type AssetSelect = typeof assets.$inferSelect;
@@ -29,8 +30,9 @@ export class AssetsRepository {
   async findAll(filters?: FindAssetsFilter): Promise<{ data: AssetSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId && UUID_REGEX.test(filters.stationId)) {
-      conditions.push(eq(assets.stationId, filters.stationId));
+    const resolvedStation = resolveStationUuid(filters?.stationId);
+    if (resolvedStation) {
+      conditions.push(eq(assets.stationId, resolvedStation));
     }
     if (filters?.buildingId && UUID_REGEX.test(filters.buildingId)) {
       conditions.push(eq(assets.buildingId, filters.buildingId));

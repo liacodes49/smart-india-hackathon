@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { predictionsController } from './predictions.controller.js';
-import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { optionalAuthMiddleware } from '../../middleware/auth.middleware.js';
 import { validate } from '../../middleware/validation.middleware.js';
 import {
   predictionQuerySchema,
@@ -16,44 +16,40 @@ const router = Router();
 
 router.get(
   '/',
-  authMiddleware,
+  optionalAuthMiddleware,
   validate(predictionQuerySchema, 'query'),
-  predictionsController.list
+  predictionsController.list,
 );
 
-router.get(
-  '/assets/:assetId/health',
-  authMiddleware,
-  predictionsController.getAssetHealth
-);
+router.get('/assets/:assetId/health', optionalAuthMiddleware, predictionsController.getAssetHealth);
 
 router.get(
   '/equipment/:assetId/health',
-  authMiddleware,
-  predictionsController.getAssetHealth
+  optionalAuthMiddleware,
+  predictionsController.getAssetHealth,
 );
 
 router.get(
   '/stations/:stationId/fuel',
-  authMiddleware,
+  optionalAuthMiddleware,
   validate(fuelForecastQuerySchema, 'query'),
-  predictionsController.getFuelForecast
+  predictionsController.getFuelForecast,
 );
 
 router.get(
   '/stations/:stationId/fuel-forecast',
-  authMiddleware,
+  optionalAuthMiddleware,
   validate(fuelForecastQuerySchema, 'query'),
-  predictionsController.getFuelForecast
+  predictionsController.getFuelForecast,
 );
 
 router.post(
   '/evaluate',
-  authMiddleware,
+  optionalAuthMiddleware,
   validate(evaluatePredictionSchema),
-  predictionsController.evaluate
+  predictionsController.evaluate,
 );
 
-router.get('/:id', authMiddleware, predictionsController.getById);
+router.get('/:id', optionalAuthMiddleware, predictionsController.getById);
 
 export const predictionsRoutes: Router = router;

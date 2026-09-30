@@ -1,24 +1,27 @@
-import { useState, useEffect } from "react";
-import { type TelemetryAsset, INITIAL_TELEMETRY } from "@/features/digital-twin/utils/StationTelemetry";
-import { apiClient } from "@/lib/api";
-import { useStationStore } from "@/stores/useStationStore";
+import { useState, useEffect } from 'react';
+import {
+  type TelemetryAsset,
+  INITIAL_TELEMETRY,
+} from '@/features/digital-twin/utils/StationTelemetry';
+import { apiClient } from '@/lib/api';
+import { useStationStore } from '@/stores/useStationStore';
 
 export function useLiveTelemetry(stationId: string) {
   const [telemetry, setTelemetry] = useState<TelemetryAsset[]>(INITIAL_TELEMETRY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [environment, setEnvironment] = useState<any>(null);
-  const [edgeStatus, setEdgeStatus] = useState<string>("ONLINE");
+  const [edgeStatus, setEdgeStatus] = useState<string>('ONLINE');
   const [stationHealthScore, setStationHealthScore] = useState<number>(85);
-  const [riskLevel, setRiskLevel] = useState<string>("LOW");
+  const [riskLevel, setRiskLevel] = useState<string>('LOW');
   const [riskAssessment, setRiskAssessment] = useState<any>(null);
   const [rawAssets, setRawAssets] = useState<any[]>([]);
-  const [stationStatus, setStationStatus] = useState<string>("OPERATIONAL");
+  const [stationStatus, setStationStatus] = useState<string>('OPERATIONAL');
 
   useEffect(() => {
     let mounted = true;
     let isFetching = false;
-    
+
     async function fetchTelemetry() {
       if (isFetching) return;
       isFetching = true;
@@ -26,13 +29,15 @@ export function useLiveTelemetry(stationId: string) {
         // Fetch twin state and active alerts concurrently for cross-system sync
         const [response, alertsRes] = await Promise.all([
           apiClient.digitalTwin.getStationTwin(stationId),
-          apiClient.alerts.list({ stationId, status: 'ACTIVE' as any, limit: 100 }).catch(() => null),
+          apiClient.alerts
+            .list({ stationId, status: 'ACTIVE' as any, limit: 100 })
+            .catch(() => null),
         ]);
-        
+
         if (!response.success || !response.data) {
-          throw new Error(response.message || "Failed to fetch station twin state");
+          throw new Error(response.message || 'Failed to fetch station twin state');
         }
-        
+
         const state = response.data;
 
         // Synchronize active and critical alert counts in global store
@@ -41,7 +46,7 @@ export function useLiveTelemetry(stationId: string) {
           const criticalCount = activeList.filter((a) => a.severity === 'CRITICAL').length;
           useStationStore.getState().setAlertCounts(activeList.length, criticalCount);
         }
-        
+
         // Recursive extraction to collect all real assets regardless of hierarchy depth
         const allAssets: any[] = [];
         const extractAssets = (nodes: any[]) => {
@@ -57,107 +62,171 @@ export function useLiveTelemetry(stationId: string) {
         if (state.rootNodes && Array.isArray(state.rootNodes)) {
           extractAssets(state.rootNodes);
         }
-        
-        // Map backend assets to the frontend TelemetryAsset model for 3D marker coloring
-        const updatedTelemetry = INITIAL_TELEMETRY.map(mockAsset => {
-          let backendCategory = "";
-          switch (mockAsset.type) {
-            case "GENERATOR": backendCategory = "GENERATOR"; break;
-            case "PUMP_HOUSE": backendCategory = "WATER_TREATMENT"; break;
-            case "ANTENNA": backendCategory = "COMMUNICATION"; break;
-            case "MAIN_BUILDING": backendCategory = "STRUCTURAL"; break;
-            case "FUEL_FARM": backendCategory = "STORAGE"; break;
-            case "CONTAINER": backendCategory = "STORAGE"; break;
-          }
-          
-          const backendAsset = allAssets.find(a => 
-            a.id === mockAsset.id ||
-            a.name.toUpperCase().includes(mockAsset.type) || 
-            (backendCategory && a.name.toUpperCase().includes(backendCategory)) ||
-            (backendCategory === 'GENERATOR' && a.name.includes("Generator")) ||
-            (backendCategory === 'WATER_TREATMENT' && a.name.includes("Pump")) ||
-            (backendCategory === 'COMMUNICATION' && (a.name.includes("Antenna") || a.name.includes("Radome")))
-          );
 
-          if (!backendAsset) {
-            return {
-              ...mockAsset,
-              lastUpdated: Date.now(),
-            };
+        // Map backend assets dynamically to TelemetryAsset models
+        const realTelemetryAssets: TelemetryAsset[] = allAssets.map((asset) => {
+          let assetType:
+            'MAIN_BUILDING' | 'FUEL_FARM' | 'GENERATOR' | 'PUMP_HOUSE' | 'CONTAINER' | 'ANTENNA' =
+            'MAIN_BUILDING';
+          const lowerName = (asset.name || '').toLowerCase();
+          const category = (asset.category || '').toUpperCase();
+
+          if (
+            lowerName.includes('generator') ||
+            lowerName.includes('genset') ||
+            category === 'POWER' ||
+            category === 'GENERATOR'
+          ) {
+            assetType = 'GENERATOR';
+          } else if (
+            lowerName.includes('fuel') ||
+            lowerName.includes('tank') ||
+            category === 'STORAGE' ||
+            category === 'FUEL'
+          ) {
+            assetType = 'FUEL_FARM';
+          } else if (
+            lowerName.includes('pump') ||
+            lowerName.includes('water') ||
+            lowerName.includes('priyadarshini') ||
+            category === 'WATER_TREATMENT' ||
+            category === 'WATER'
+          ) {
+            assetType = 'PUMP_HOUSE';
+          } else if (
+            lowerName.includes('antenna') ||
+            lowerName.includes('radome') ||
+            lowerName.includes('sat') ||
+            category === 'COMMUNICATION'
+          ) {
+            assetType = 'ANTENNA';
+          } else if (
+            lowerName.includes('container') ||
+            lowerName.includes('module') ||
+            lowerName.includes('storage')
+          ) {
+            assetType = 'CONTAINER';
           }
-          
-          let temperature = mockAsset.temperature;
-          let power = mockAsset.power;
-          let fuel = mockAsset.fuel;
-          let water = mockAsset.water;
-          
-          if (backendAsset.children) {
-            backendAsset.children.forEach((sensor: any) => {
+
+          let temperature = 0;
+          let power = 0;
+          let fuel = 0;
+          let water = 0;
+
+          if (asset.children && Array.isArray(asset.children)) {
+            asset.children.forEach((sensor: any) => {
               const summary = sensor.telemetrySummary;
               if (summary) {
                 if (summary.TEMPERATURE) temperature = summary.TEMPERATURE.value;
                 if (summary.POWER) power = summary.POWER.value;
                 if (summary.FUEL) fuel = summary.FUEL.value;
                 if (summary.WATER) water = summary.WATER.value;
+              } else if (sensor.lastReading != null) {
+                if (sensor.unit === '°C') temperature = sensor.lastReading;
+                else if (sensor.unit === 'kW') power = sensor.lastReading;
+                else if (
+                  sensor.unit === '%' &&
+                  (sensor.type === 'FUEL' ||
+                    (sensor.name && sensor.name.toLowerCase().includes('fuel')))
+                )
+                  fuel = sensor.lastReading;
+                else if (sensor.unit === '%' || sensor.unit === 'L/min' || sensor.unit === 'bar')
+                  water = sensor.lastReading;
               }
             });
           }
 
-          let health = mockAsset.health;
-          if (backendAsset.healthColor === "RED") health = "CRITICAL";
-          else if (backendAsset.healthColor === "YELLOW") health = "WARNING";
-          else if (backendAsset.healthColor === "GREEN") health = "NORMAL";
-          
+          let health: 'NORMAL' | 'WARNING' | 'CRITICAL' | 'OFFLINE' = 'NORMAL';
+          if (
+            asset.healthColor === 'RED' ||
+            asset.status === 'CRITICAL' ||
+            asset.status === 'EMERGENCY'
+          )
+            health = 'CRITICAL';
+          else if (asset.healthColor === 'YELLOW' || asset.status === 'WARNING') health = 'WARNING';
+          else if (asset.status === 'OFFLINE' || asset.status === 'DECOMMISSIONED')
+            health = 'OFFLINE';
+
           return {
-            ...mockAsset,
-            id: backendAsset.id, // Align real asset ID for target lock
+            id: asset.id,
+            name: asset.name,
+            type: assetType,
+            health,
             temperature,
             power,
             fuel,
             water,
-            health,
             lastUpdated: Date.now(),
           };
         });
-        
+
+        // Combine all dynamic real assets
+        const updatedTelemetry: TelemetryAsset[] = [...realTelemetryAssets];
+
+        // Also ensure standard 3D procedural node IDs exist by linking to matching real assets
+        const proceduralIds = [
+          { id: 'main-building', type: 'MAIN_BUILDING' as const },
+          { id: 'fuel-farm', type: 'FUEL_FARM' as const },
+          { id: 'generator', type: 'GENERATOR' as const },
+          { id: 'pump-house', type: 'PUMP_HOUSE' as const },
+          { id: 'container-01', type: 'CONTAINER' as const },
+          { id: 'antenna', type: 'ANTENNA' as const },
+        ];
+
+        proceduralIds.forEach((proc) => {
+          const matchingReal = realTelemetryAssets.find((r) => r.type === proc.type);
+          if (matchingReal) {
+            updatedTelemetry.push({
+              ...matchingReal,
+              id: proc.id, // alias for 3D procedural renderer
+            });
+          } else {
+            const init = INITIAL_TELEMETRY.find((i) => i.id === proc.id);
+            if (init) updatedTelemetry.push(init);
+          }
+        });
+
         if (mounted) {
           setTelemetry(updatedTelemetry);
           setEnvironment(state.environmentalSkybox || null);
-          setEdgeStatus(state.edgeStatus || "ONLINE");
+          setEdgeStatus(state.edgeStatus || 'ONLINE');
           setStationHealthScore(state.stationHealthScore ?? 85);
-          setRiskLevel(state.riskLevel || "LOW");
+          setRiskLevel(state.riskLevel || 'LOW');
           setRiskAssessment((state as any).riskAssessment || null);
           setRawAssets(allAssets);
-          setStationStatus(state.status || "OPERATIONAL");
+          setStationStatus(state.status || 'OPERATIONAL');
           setError(null);
         }
       } catch (err: any) {
-        console.warn("LiveTelemetry Hook warning:", err?.message || err?.code || String(err));
-        if (mounted) setError(err instanceof Error ? err : new Error(err?.message || 'Failed to fetch telemetry'));
+        console.warn('LiveTelemetry Hook warning:', err?.message || err?.code || String(err));
+        if (mounted)
+          setError(
+            err instanceof Error ? err : new Error(err?.message || 'Failed to fetch telemetry'),
+          );
       } finally {
         isFetching = false;
         if (mounted) setLoading(false);
       }
     }
-    
+
     // Clear data to prevent state bleed when switching stations
     setTelemetry(INITIAL_TELEMETRY);
     setEnvironment(null);
-    setEdgeStatus("ONLINE");
-    
+    setEdgeStatus('ONLINE');
+
     // Initial fetch
     fetchTelemetry();
-    
+
     // Setup SSE for real-time updates instead of polling
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     let eventSource: EventSource | null = null;
-    
+
     try {
       // Create EventSource.
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
       const sseUrl = `${baseUrl}/telemetry/stream${token ? `?token=${token}` : ''}`;
       eventSource = new EventSource(sseUrl);
-      
+
       eventSource.onopen = () => {
         useStationStore.getState().setLiveConnected(true);
       };
@@ -202,7 +271,7 @@ export function useLiveTelemetry(stationId: string) {
       console.warn('Failed to setup SSE, falling back to polling', err);
       setInterval(fetchTelemetry, 6000);
     }
-    
+
     return () => {
       mounted = false;
       useStationStore.getState().setLiveConnected(false);

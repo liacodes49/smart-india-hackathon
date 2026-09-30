@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import { incidentsController } from './incidents.controller.js';
-import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { authMiddleware, optionalAuthMiddleware } from '../../middleware/auth.middleware.js';
 import { validate } from '../../middleware/validation.middleware.js';
 import {
   createIncidentSchema,
@@ -15,10 +15,20 @@ import {
 
 const router = Router();
 
-router.get('/', authMiddleware, validate(incidentQuerySchema, 'query'), incidentsController.list);
+router.get(
+  '/',
+  optionalAuthMiddleware,
+  validate(incidentQuerySchema, 'query'),
+  incidentsController.list,
+);
 router.post('/', authMiddleware, validate(createIncidentSchema), incidentsController.create);
-router.post('/from-alert/:alertId', authMiddleware, validate(escalateAlertSchema), incidentsController.escalateFromAlert);
-router.get('/:id', authMiddleware, incidentsController.getById);
+router.post(
+  '/from-alert/:alertId',
+  authMiddleware,
+  validate(escalateAlertSchema),
+  incidentsController.escalateFromAlert,
+);
+router.get('/:id', optionalAuthMiddleware, incidentsController.getById);
 router.patch('/:id', authMiddleware, validate(updateIncidentSchema), incidentsController.update);
 router.post('/:id/assign', authMiddleware, incidentsController.assign);
 router.post('/:id/resolve', authMiddleware, incidentsController.resolve);

@@ -6,6 +6,7 @@ import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { db } from '../../config/database.js';
 import { maintenanceRecords } from '../../db/schema/index.js';
 import type { MaintenanceType, MaintenancePriority, MaintenanceStatus } from '@repo/shared';
+import { resolveStationUuid } from '../../utils/index.js';
 
 export type MaintenanceRecordInsert = typeof maintenanceRecords.$inferInsert;
 export type MaintenanceRecordSelect = typeof maintenanceRecords.$inferSelect;
@@ -77,8 +78,9 @@ export class MaintenanceRepository {
   ): Promise<{ data: MaintenanceRecordSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId && UUID_REGEX.test(filters.stationId)) {
-      conditions.push(eq(maintenanceRecords.stationId, filters.stationId));
+    const resolvedStation = resolveStationUuid(filters?.stationId);
+    if (resolvedStation) {
+      conditions.push(eq(maintenanceRecords.stationId, resolvedStation));
     }
     if (filters?.assetId && UUID_REGEX.test(filters.assetId)) {
       conditions.push(eq(maintenanceRecords.assetId, filters.assetId));

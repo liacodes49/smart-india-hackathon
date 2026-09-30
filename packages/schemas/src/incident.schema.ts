@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
 export const incidentSeveritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
-export const incidentStatusSchema = z.enum(['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']);
+export const incidentStatusSchema = z.enum([
+  'OPEN',
+  'ASSIGNED',
+  'IN_PROGRESS',
+  'RESOLVED',
+  'CLOSED',
+]);
 
 export const createIncidentSchema = z.object({
   stationId: z.string().uuid(),
@@ -41,7 +47,7 @@ export const escalateAlertSchema = z.object({
 export type EscalateAlertInput = z.infer<typeof escalateAlertSchema>;
 
 export const incidentQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
   severity: incidentSeveritySchema.optional(),
   status: incidentStatusSchema.optional(),
   assignedTo: z.string().uuid().optional(),
@@ -50,4 +56,3 @@ export const incidentQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type IncidentQueryInput = z.infer<typeof incidentQuerySchema>;
-

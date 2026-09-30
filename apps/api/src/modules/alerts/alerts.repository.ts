@@ -8,6 +8,7 @@ import { eq, and, sql, desc } from 'drizzle-orm';
 import { db } from '../../config/database.js';
 import { alerts, users } from '../../db/schema/index.js';
 import type { AlertSeverity, AlertStatus, AlertCategory } from '@repo/shared';
+import { resolveStationUuid } from '../../utils/index.js';
 
 export type AlertInsert = typeof alerts.$inferInsert;
 export type AlertSelect = typeof alerts.$inferSelect;
@@ -59,8 +60,9 @@ export class AlertsRepository {
   async findAll(filters?: FindAlertsFilter): Promise<{ data: AlertSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId && this.isUuid(filters.stationId)) {
-      conditions.push(eq(alerts.stationId, filters.stationId));
+    const resolvedStation = resolveStationUuid(filters?.stationId);
+    if (resolvedStation) {
+      conditions.push(eq(alerts.stationId, resolvedStation));
     }
     if (filters?.sensorId && this.isUuid(filters.sensorId)) {
       conditions.push(eq(alerts.sensorId, filters.sensorId));

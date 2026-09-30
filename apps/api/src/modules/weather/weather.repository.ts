@@ -8,6 +8,7 @@ import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../../config/database.js';
 import { weatherObservations } from '../../db/schema/index.js';
 import type { DataProvenance } from '@repo/shared';
+import { resolveStationUuid } from '../../utils/index.js';
 
 export type WeatherObservationInsert = typeof weatherObservations.$inferInsert;
 export type WeatherObservationSelect = typeof weatherObservations.$inferSelect;
@@ -24,7 +25,7 @@ export interface FindWeatherObservationsFilter {
 export class WeatherRepository {
   async create(data: WeatherObservationInsert): Promise<WeatherObservationSelect> {
     const [record] = await db.insert(weatherObservations).values(data).returning();
-    return record!;
+    return record;
   }
 
   async createMany(data: WeatherObservationInsert[]): Promise<WeatherObservationSelect[]> {
@@ -33,10 +34,11 @@ export class WeatherRepository {
   }
 
   async findLatestByStation(stationId: string): Promise<WeatherObservationSelect | null> {
+    const resolvedStation = resolveStationUuid(stationId) ?? stationId;
     const [latest] = await db
       .select()
       .from(weatherObservations)
-      .where(eq(weatherObservations.stationId, stationId))
+      .where(eq(weatherObservations.stationId, resolvedStation))
       .orderBy(desc(weatherObservations.recordedAt))
       .limit(1);
 
@@ -47,9 +49,10 @@ export class WeatherRepository {
     stationId: string,
     startDate?: Date,
     endDate?: Date,
-    limit: number = 100
+    limit: number = 100,
   ): Promise<WeatherObservationSelect[]> {
-    const conditions = [eq(weatherObservations.stationId, stationId)];
+    const resolvedStation = resolveStationUuid(stationId) ?? stationId;
+    const conditions = [eq(weatherObservations.stationId, resolvedStation)];
 
     if (startDate) {
       conditions.push(gte(weatherObservations.recordedAt, startDate));
@@ -67,12 +70,13 @@ export class WeatherRepository {
   }
 
   async findAll(
-    filters?: FindWeatherObservationsFilter
+    filters?: FindWeatherObservationsFilter,
   ): Promise<{ data: WeatherObservationSelect[]; total: number }> {
     const conditions = [];
 
-    if (filters?.stationId) {
-      conditions.push(eq(weatherObservations.stationId, filters.stationId));
+    const resolvedStation = resolveStationUuid(filters?.stationId);
+    if (resolvedStation) {
+      conditions.push(eq(weatherObservations.stationId, resolvedStation));
     }
     if (filters?.provenance) {
       conditions.push(eq(weatherObservations.provenance, filters.provenance));

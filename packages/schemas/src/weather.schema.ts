@@ -14,23 +14,14 @@ export const createWeatherObservationSchema = z.object({
   pressure: z.number().min(800).max(1150),
   humidity: z.number().min(0).max(100),
   visibilityMeters: z.number().int().min(0).max(100000),
-  condition: z.enum([
-    'CLEAR',
-    'PARTLY_CLOUDY',
-    'OVERCAST',
-    'SNOW',
-    'BLIZZARD',
-    'KATABATIC_GALE',
-  ]),
-  provenance: z
-    .enum(['SIMULATED', 'SENSOR', 'EXTERNAL_API', 'MANUAL'])
-    .default('SIMULATED'),
+  condition: z.enum(['CLEAR', 'PARTLY_CLOUDY', 'OVERCAST', 'SNOW', 'BLIZZARD', 'KATABATIC_GALE']),
+  provenance: z.enum(['SIMULATED', 'SENSOR', 'EXTERNAL_API', 'MANUAL']).default('SIMULATED'),
   recordedAt: z.string().datetime().optional(),
 });
 export type CreateWeatherObservationInput = z.infer<typeof createWeatherObservationSchema>;
 
 export const weatherQuerySchema = z.object({
-  stationId: z.string().uuid().optional(),
+  stationId: z.string().min(1).optional(),
   provenance: z.enum(['SIMULATED', 'SENSOR', 'EXTERNAL_API', 'MANUAL']).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),

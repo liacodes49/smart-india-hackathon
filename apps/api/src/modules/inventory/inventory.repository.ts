@@ -24,11 +24,28 @@ export interface FindInventoryFilter {
 }
 
 export class InventoryRepository {
-  async findAll(filters?: FindInventoryFilter): Promise<{ data: InventoryItemSelect[]; total: number }> {
+  async findAll(
+    filters?: FindInventoryFilter,
+  ): Promise<{ data: InventoryItemSelect[]; total: number }> {
     const conditions = [];
 
     if (filters?.stationId) {
-      conditions.push(eq(inventoryItems.stationId, filters.stationId));
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        filters.stationId,
+      );
+      if (isUuid) {
+        conditions.push(eq(inventoryItems.stationId, filters.stationId));
+      } else {
+        const resolvedId =
+          filters.stationId.toUpperCase() === 'MAITRI'
+            ? '00000000-0000-0000-0000-000000000001'
+            : filters.stationId.toUpperCase() === 'BHARATI'
+              ? '00000000-0000-0000-0000-000000000002'
+              : null;
+        if (resolvedId) {
+          conditions.push(eq(inventoryItems.stationId, resolvedId));
+        }
+      }
     }
     if (filters?.category) {
       conditions.push(eq(inventoryItems.category, filters.category));
@@ -87,7 +104,10 @@ export class InventoryRepository {
     return created;
   }
 
-  async update(id: string, data: Partial<InventoryItemInsert>): Promise<InventoryItemSelect | null> {
+  async update(
+    id: string,
+    data: Partial<InventoryItemInsert>,
+  ): Promise<InventoryItemSelect | null> {
     const [updated] = await db
       .update(inventoryItems)
       .set({
@@ -127,7 +147,10 @@ export class InventoryRepository {
     return created;
   }
 
-  async getConsumptionHistory(inventoryItemId: string, limit = 50): Promise<ResourceConsumptionSelect[]> {
+  async getConsumptionHistory(
+    inventoryItemId: string,
+    limit = 50,
+  ): Promise<ResourceConsumptionSelect[]> {
     return db
       .select()
       .from(resourceConsumption)
@@ -143,8 +166,8 @@ export class InventoryRepository {
       .where(
         and(
           eq(inventoryItems.stationId, stationId),
-          lt(inventoryItems.currentStock, inventoryItems.minimumThreshold)
-        )
+          lt(inventoryItems.currentStock, inventoryItems.minimumThreshold),
+        ),
       );
   }
 }
