@@ -133,15 +133,17 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
   const handleTransmitReading = async (metricName: string, value: number, unit: string) => {
     try {
       setIsTransmitting(true);
-      // Ingest sensor reading via API
-      let target = sensors.find(
+
+      // Multi-strategy sensor match:
+      // 1) Name substring match  2) Exact unit match  3) No match → skip ingest
+      const normalizeUnit = (u: string) => u.replace(/[^a-zA-Z0-9%°]/g, "").toLowerCase();
+      const targetUnit = normalizeUnit(unit);
+
+      const target = sensors.find(
         (s) =>
           s.name.toLowerCase().includes(metricName.toLowerCase()) ||
-          s.unit.toLowerCase() === unit.toLowerCase()
+          normalizeUnit(s.unit) === targetUnit
       );
-      if (!target && sensors.length > 0) {
-        target = sensors[0];
-      }
 
       if (target) {
         await apiClient.telemetry.ingest({
@@ -149,14 +151,18 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
           stationId,
           timestamp: new Date().toISOString(),
           value,
-          unit: target.unit,
+          unit: target.unit, // always use the registered sensor unit
           status: value >= (target.criticalThreshold ?? 90) ? "CRITICAL" : value >= (target.warningThreshold ?? 80) ? "WARNING" : "NORMAL",
           quality: 100,
         });
+        const logEntry = `[TX → GOA HQ]: ${metricName} = ${value} ${unit} (ACK via ${target.name})`;
+        setTxLogs((prev) => [logEntry, ...prev.slice(0, 15)]);
+      } else {
+        // No matching sensor in registry — log locally only, do not call API
+        const logEntry = `[TX LOCAL]: ${metricName} = ${value} ${unit} (no matching sensor — local record only)`;
+        setTxLogs((prev) => [logEntry, ...prev.slice(0, 15)]);
       }
 
-      const logEntry = `[TX → GOA HQ]: ${metricName} = ${value} ${unit} (ACK)`;
-      setTxLogs((prev) => [logEntry, ...prev.slice(0, 15)]);
       useStationStore.getState().recordTelemetryTick();
     } catch (err: any) {
       const errMsg = err?.message || err?.error?.message || (typeof err === "string" ? err : "Sensor transmission error");
@@ -166,6 +172,7 @@ export function StationEdgeConsole({ stationId }: StationEdgeConsoleProps) {
       setIsTransmitting(false);
     }
   };
+
 
   // Push One-Touch Crisis Anomaly Scenario
   const handleTriggerAnomaly = async (scenario: "GEN_CRITICAL" | "FREEZE_WATER" | "BLIZZARD_SURGE") => {
